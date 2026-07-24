@@ -170,12 +170,12 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
 
       setProgress(40);
 
-      // Multi-proxy CORS fetcher
+      // Try direct fetch first for Google Apps Script WebApps, then proxy fallbacks
       const proxies = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(execUrl)}`,
+        execUrl,
         `https://corsproxy.io/?${encodeURIComponent(execUrl)}`,
         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(execUrl)}`,
-        execUrl
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(execUrl)}`
       ];
 
       let rawData = null;
@@ -183,10 +183,10 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
 
       for (const endpoint of proxies) {
         try {
-          const res = await fetch(endpoint);
+          const res = await fetch(endpoint, { redirect: 'follow' });
           if (res.ok) {
             const text = await res.text();
-            if (text && text.length > 5) {
+            if (text && text.length > 5 && !text.includes('Cloudflare') && !text.includes('Attention Required')) {
               try {
                 rawData = JSON.parse(text);
               } catch (e) {
@@ -197,7 +197,7 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
             }
           }
         } catch (err) {
-          console.warn('Proxy fetch attempt failed:', endpoint);
+          console.warn('Fetch attempt failed for endpoint:', endpoint);
         }
       }
 
