@@ -86,6 +86,50 @@ export default function App() {
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [onboardingSteps, setOnboardingSteps] = useState(ONBOARDING_STEPS);
 
+  // Automatic Direct Cloud Sync for Google Sheet / WebApp URL on page load & mount!
+  useEffect(() => {
+    const autoSyncGoogleSheet = async () => {
+      try {
+        const webAppUrl = 'https://script.google.com/macros/s/AKfycbwfljG3mY5G3vn9_nGWQCfqZUyz1V44n23uHWPsmdsWCClPLfZGJMJ_ZF5seW0zSgzxQA/exec';
+        const res = await fetch(webAppUrl, { redirect: 'follow' });
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json) && json.length > 0) {
+            const formatted = json.map((p, i) => ({
+              id: p.id || `PROD-GS-${Date.now()}-${i}`,
+              name: p.name || p.title || `Product #${i + 1}`,
+              category: p.category || p.type || 'General Catalog',
+              wholesalePrice: parseFloat(p.wholesalePrice || p.cost || 350),
+              shippingFee: 75,
+              suggestedMrp: parseFloat(p.suggestedMrp || p.price || 1299),
+              stock: 500,
+              rating: 4.8,
+              image: p.image || (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80"),
+              images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image].filter(Boolean),
+              sku: p.sku || `SKU-GS-${Date.now()}-${i}`,
+              description: p.description || "Imported product."
+            }));
+            
+            setProducts(prev => {
+              const existingSkus = new Set(prev.map(item => item.sku));
+              const newItems = formatted.filter(item => !existingSkus.has(item.sku));
+              if (newItems.length > 0) {
+                const updated = [...newItems, ...prev];
+                dbService.saveProducts(updated);
+                return updated;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Auto Google Sheet sync quiet attempt:', err);
+      }
+    };
+
+    autoSyncGoogleSheet();
+  }, []);
+
   // Load Isolated Data when User changes
   useEffect(() => {
     if (user?.id) {
