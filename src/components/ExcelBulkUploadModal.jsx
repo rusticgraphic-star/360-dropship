@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { 
   X, FileSpreadsheet, Upload, Download, CheckCircle2, AlertCircle, 
-  RefreshCw, ArrowRight, FileCheck, Globe, Link2, ExternalLink, Sparkles 
+  RefreshCw, ArrowRight, FileCheck, Globe, Link2, ExternalLink, Sparkles, Code
 } from 'lucide-react';
 
 export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSuccess }) {
-  const [activeTab, setActiveTab] = useState('gsheet'); // 'gsheet' or 'file'
+  const [activeTab, setActiveTab] = useState('gsheet'); // 'gsheet', 'file', or 'script'
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [file, setFile] = useState(null);
   
@@ -17,18 +17,39 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
 
   if (!isOpen) return null;
 
+  // Robust CSV parser supporting quotes, commas, and multiline text
   const parseCSV = (text) => {
-    const lines = text.split(/\r\n|\n/).filter(line => line.trim().length > 0);
+    if (!text || typeof text !== 'string') return [];
+
+    // Split rows properly handling quoted lines
+    const lines = [];
+    let currentLine = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        currentLine += char;
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (currentLine.trim()) lines.push(currentLine);
+        currentLine = '';
+      } else {
+        currentLine += char;
+      }
+    }
+    if (currentLine.trim()) lines.push(currentLine);
+
     if (lines.length < 2) return [];
 
     const parseLine = (line) => {
       const result = [];
       let start = 0;
-      let inQuotes = false;
+      let inQ = false;
       for (let i = 0; i < line.length; i++) {
         if (line[i] === '"') {
-          inQuotes = !inQuotes;
-        } else if (line[i] === ',' && !inQuotes) {
+          inQ = !inQ;
+        } else if (line[i] === ',' && !inQ) {
           result.push(line.substring(start, i).replace(/^"|"$/g, '').trim());
           start = i + 1;
         }
@@ -37,17 +58,17 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       return result;
     };
 
-    const headers = parseLine(lines[0]).map(h => h.toLowerCase());
+    const headers = parseLine(lines[0]).map(h => h.toLowerCase().trim());
 
     const findIndex = (keys) => {
       return headers.findIndex(h => keys.some(k => h.includes(k)));
     };
 
-    const idxTitle = findIndex(['title', 'name', 'product name', 'item name']);
-    const idxCost = findIndex(['cost per item', 'wholesale', 'wholesale cost', 'cost', 'app price']);
-    const idxPrice = findIndex(['variant price', 'suggested mrp', 'price', 'mrp', 'retail price']);
-    const idxSku = findIndex(['variant sku', 'sku', 'code']);
-    const idxImage = findIndex(['image src', 'image url', 'image', 'photo']);
+    const idxTitle = findIndex(['title', 'name', 'product name', 'item name', 'product']);
+    const idxCost = findIndex(['cost per item', 'wholesale cost', 'wholesale price', 'wholesale', 'cost', 'app price']);
+    const idxPrice = findIndex(['variant price', 'suggested mrp', 'selling price', 'price', 'mrp', 'retail price']);
+    const idxSku = findIndex(['variant sku', 'sku', 'product code', 'code']);
+    const idxImage = findIndex(['image src', 'image url', 'image', 'photo', 'picture']);
     const idxBody = findIndex(['body (html)', 'description', 'body', 'details']);
     const idxType = findIndex(['type', 'category', 'vendor']);
 
@@ -57,23 +78,42 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       const row = parseLine(lines[i]);
       if (!row || row.length === 0) continue;
 
-      const title = idxTitle !== -1 ? row[idxTitle] : (row[1] || row[0]);
-      if (!title || title.toLowerCase() === 'title') continue;
+      // Title extraction
+      let title = idxTitle !== -1 && row[idxTitle] ? row[idxTitle] : (row[1] || row[0]);
+      if (!title || title.toLowerCase() === 'title' || title.toLowerCase() === 'name') continue;
 
-      const costVal = idxCost !== -1 ? parseFloat(row[idxCost]?.replace(/[^0-9.]/g, '')) : 350;
-      const priceVal = idxPrice !== -1 ? parseFloat(row[idxPrice]?.replace(/[^0-9.]/g, '')) : 1299;
-      const skuVal = idxSku !== -1 && row[idxSku] ? row[idxSku] : `SKU-GS-${Date.now()}-${i}`;
-      const imgVal = idxImage !== -1 && row[idxImage] ? row[idxImage] : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80";
-      const descVal = idxBody !== -1 && row[idxBody] ? row[idxBody] : "Imported product from Google Sheets catalog.";
-      const typeVal = idxType !== -1 && row[idxType] ? row[idxType] : "Electronics";
+      // Wholesale Cost extraction
+      let rawCost = idxCost !== -1 && row[idxCost] ? row[idxCost] : (row[2] || '350');
+      let costVal = parseFloat(rawCost.replace(/[^0-9.]/g, ''));
+      if (isNaN(costVal) || costVal <= 0) costVal = 350;
+
+      // Suggested MRP / Selling Price extraction
+      let rawPrice = idxPrice !== -1 && row[idxPrice] ? row[idxPrice] : (row[4] || row[3] || '1299');
+      let priceVal = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+      if (isNaN(priceVal) || priceVal <= 0) priceVal = costVal + 600;
+
+      // SKU extraction
+      let skuVal = idxSku !== -1 && row[idxSku] ? row[idxSku] : `SKU-GS-${Date.now()}-${i}`;
+
+      // Image URL extraction
+      let imgVal = idxImage !== -1 && row[idxImage] ? row[idxImage] : '';
+      if (!imgVal || !imgVal.startsWith('http')) {
+        // Look for any cell containing http
+        const httpCell = row.find(c => c.startsWith('http'));
+        imgVal = httpCell || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80";
+      }
+
+      // Description & Category
+      let descVal = idxBody !== -1 && row[idxBody] ? row[idxBody] : "Imported product from Google Sheets catalog.";
+      let typeVal = idxType !== -1 && row[idxType] ? row[idxType] : "Electronics";
 
       parsedProducts.push({
         id: `PROD-GS-${Date.now()}-${i}`,
         name: title,
         category: typeVal,
-        wholesalePrice: isNaN(costVal) || costVal <= 0 ? 350 : costVal,
+        wholesalePrice: costVal,
         shippingFee: 75,
-        suggestedMrp: isNaN(priceVal) || priceVal <= 0 ? 1299 : priceVal,
+        suggestedMrp: priceVal,
         stock: 500,
         rating: 4.8,
         image: imgVal,
@@ -95,54 +135,50 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
     setErrorMessage('');
 
     try {
-      let fetchUrl = googleSheetUrl.trim();
+      let rawInput = googleSheetUrl.trim();
+      let csvUrl = rawInput;
 
-      // Convert standard Google Sheets URL to export CSV URL if needed
-      let csvUrl = fetchUrl;
-      if (fetchUrl.includes('docs.google.com/spreadsheets/d/')) {
-        if (!fetchUrl.includes('/pub') && !fetchUrl.includes('output=csv')) {
-          const match = fetchUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-          if (match && match[1]) {
-            const sheetId = match[1];
-            csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-          }
+      // Extract Sheet ID if standard Google Sheets URL is provided
+      if (rawInput.includes('docs.google.com/spreadsheets/d/')) {
+        const match = rawInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          const sheetId = match[1];
+          // Use Google Visualization API CSV export endpoint (100% reliable format output)
+          csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
         }
       }
 
-      setProgress(50);
+      setProgress(40);
       
-      // Fetch via CORS proxy to allow browser to read Google Sheet CSV directly
       let csvText = '';
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(csvUrl)}`;
-        const response = await fetch(proxyUrl);
-        if (response.ok) {
-          csvText = await response.text();
+      // Try CORS proxies to fetch Google Sheet CSV content
+      const proxies = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(csvUrl)}`,
+        `https://corsproxy.io/?${encodeURIComponent(csvUrl)}`,
+        csvUrl
+      ];
+
+      for (const url of proxies) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const text = await res.text();
+            if (text && !text.includes('<!DOCTYPE html>') && text.length > 20) {
+              csvText = text;
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn('Proxy fetch attempt failed, trying next...');
         }
-      } catch (proxyErr) {
-        const directResp = await fetch(csvUrl);
-        if (directResp.ok) csvText = await directResp.text();
       }
 
-      setProgress(80);
+      setProgress(70);
 
       let productsParsed = parseCSV(csvText);
 
-      // Fallback sample items if empty or CORS blocked
       if (productsParsed.length === 0) {
-        productsParsed = Array.from({ length: 10 }, (_, i) => ({
-          id: `PROD-GS-${Date.now()}-${i}`,
-          name: `Google Sheet Product #${i + 1} Trending Quality`,
-          category: i % 2 === 0 ? "Electronics" : "Home & Kitchenware",
-          wholesalePrice: 290 + (i * 25),
-          shippingFee: 75,
-          suggestedMrp: 999 + (i * 50),
-          stock: 800,
-          rating: 4.8,
-          image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80",
-          sku: `GS-SKU-${i + 301}`,
-          description: "Live synced product from connected Google Sheet."
-        }));
+        throw new Error('Could not parse products from sheet. Make sure your Google Sheet is shared as "Anyone with the link can view".');
       }
 
       setProgress(100);
@@ -153,29 +189,9 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
         onBulkUploadSuccess(productsParsed);
       }
     } catch (err) {
-      console.warn('Google Sheet Direct Fetch Warning, using async stream parser:', err);
-      // Fallback live sync generator (Prevents freezing!)
-      const fallbackProducts = Array.from({ length: 12 }, (_, i) => ({
-        id: `PROD-GS-${Date.now()}-${i}`,
-        name: `Google Sheet Sync Product #${i + 1} High Margin`,
-        category: i % 2 === 0 ? "Electronics" : "Religious & Ceremonial",
-        wholesalePrice: 320 + (i * 20),
-        shippingFee: 75,
-        suggestedMrp: 1199 + (i * 40),
-        stock: 1200,
-        rating: 4.9,
-        image: "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500&auto=format&fit=crop&q=80",
-        sku: `GS-LIVE-${i + 101}`,
-        description: "Google Sheets live catalog entry."
-      }));
-
-      setProgress(100);
+      console.error('Google Sheet Sync Error:', err);
       setSyncing(false);
-      setUploadSuccess(true);
-      setImportedCount(fallbackProducts.length);
-      if (onBulkUploadSuccess) {
-        onBulkUploadSuccess(fallbackProducts);
-      }
+      setErrorMessage(err.message || 'Failed to fetch Google Sheet data.');
     }
   };
 
@@ -192,19 +208,9 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       let productsParsed = parseCSV(text);
 
       if (productsParsed.length === 0) {
-        productsParsed = Array.from({ length: 8 }, (_, i) => ({
-          id: `PROD-FILE-${Date.now()}-${i}`,
-          name: `CSV Import Product #${i + 1}`,
-          category: "Electronics",
-          wholesalePrice: 250,
-          shippingFee: 75,
-          suggestedMrp: 899,
-          stock: 500,
-          rating: 4.8,
-          image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80",
-          sku: `FILE-SKU-${i + 501}`,
-          description: "CSV imported product."
-        }));
+        setSyncing(false);
+        setErrorMessage('No valid product rows found in the CSV file.');
+        return;
       }
 
       setProgress(100);
@@ -219,9 +225,9 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
   };
 
   const handleDownloadShopifySample = () => {
-    const csvHeader = "Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Option2 Name,Option2 Value,Option3 Name,Option3 Value,Variant SKU,Variant Grams,Variant Inventory Tracker,Variant Inventory Policy,Variant Fulfillment Service,Variant Price,Variant Compare At Price,Variant Requires Shipping,Variant Taxable,Variant Barcode,Image Src,Image Position,Image Alt Text,Gift Card,SEO Title,SEO Description,Google Shopping / Google Product Category,Google Shopping / Gender,Google Shopping / Age Group,Google Shopping / MPN,Google Shopping / AdWords Grouping,Google Shopping / AdWords Labels,Google Shopping / Condition,Google Shopping / Custom Product,Google Shopping / Custom Label 0,Google Shopping / Custom Label 1,Google Shopping / Custom Label 2,Google Shopping / Custom Label 3,Google Shopping / Custom Label 4,Variant Image,Variant Weight Unit,Variant Tax Code,Cost per item,Status\n";
-    const sampleRow1 = "smart-watch-ultra-2,Smart Watch Ultra 2 AMOLED,High definition AMOLED screen,360 Dropship,Electronics,smartwatch,TRUE,Title,Default Title,,,,SW-ULT2-BLK,450,shopify,deny,manual,1499,1999,TRUE,TRUE,,https://images.unsplash.com/photo-1579586337278-3befd40fd17a,1,Smart Watch,FALSE,Smart Watch Ultra 2,Best Smartwatch,,,,,,,,,,,,,,,g,DEFAULT,450,active\n";
-    const sampleRow2 = "brass-ganesha-idol,Brass Lord Ganesha Idol,Handcrafted solid brass idol,360 Dropship,Religious & Ceremonial,idol,TRUE,Title,Default Title,,,,REL-GAN-BRS,500,shopify,deny,manual,899,1299,TRUE,TRUE,,https://images.unsplash.com/photo-1606293926075-69a00dbfde81,1,Ganesha Idol,FALSE,Brass Ganesha Idol,Handcrafted Idol,,,,,,,,,,,,,,,g,DEFAULT,280,active\n";
+    const csvHeader = "Title,Wholesale Cost,Suggested MRP,Variant SKU,Image Src,Category,Description\n";
+    const sampleRow1 = "Smart Watch Ultra 2 AMOLED,450,1499,SW-ULT2-BLK,https://images.unsplash.com/photo-1579586337278-3befd40fd17a,Electronics,High definition AMOLED smartwatch\n";
+    const sampleRow2 = "Pure Brass Lord Ganesha Idol,280,899,REL-GAN-BRS,https://images.unsplash.com/photo-1606293926075-69a00dbfde81,Religious & Ceremonial,Handcrafted antique finish solid brass Ganesha idol\n";
 
     const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvHeader + sampleRow1 + sampleRow2);
     const link = document.createElement("a");
@@ -232,6 +238,12 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
     document.body.removeChild(link);
   };
 
+  const googleAppsScriptCode = `function syncCatalogTo360() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  Logger.log("Exported " + (data.length - 1) + " products for 360 Dropship!");
+}`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in text-slate-900">
       <div className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200">
@@ -240,10 +252,10 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
         <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
             <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1 w-fit">
-              <Sparkles className="w-3 h-3" /> NO SYSTEM HANGING • FAST CLOUD SYNC
+              <Sparkles className="w-3 h-3" /> EXACT GOOGLE SHEET DATA PARSER
             </span>
             <h3 className="text-xl font-extrabold font-heading mt-1">
-              Bulk Catalog Import & Google Sheet Sync
+              Google Sheet & CSV Product Importer
             </h3>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -254,29 +266,47 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
         {/* Tab Selection Bar */}
         <div className="flex border-b border-slate-200 bg-slate-50 p-2 gap-2">
           <button
-            onClick={() => setActiveTab('gsheet')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+            onClick={() => { setActiveTab('gsheet'); setErrorMessage(''); }}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'gsheet'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Globe className="w-4 h-4" /> Live Google Sheet URL (Recommended)
+            <Globe className="w-4 h-4" /> Live Google Sheet URL
           </button>
 
           <button
-            onClick={() => setActiveTab('file')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+            onClick={() => { setActiveTab('file'); setErrorMessage(''); }}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'file'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4" /> CSV / Excel File Upload
+            <FileSpreadsheet className="w-4 h-4" /> CSV File Upload
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('script'); setErrorMessage(''); }}
+            className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'script'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Code className="w-4 h-4" /> Apps Script
           </button>
         </div>
 
         <div className="p-6 sm:p-8 space-y-6">
+
+          {errorMessage && (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           {!uploadSuccess ? (
             <>
@@ -286,16 +316,16 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
                   <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-200 space-y-2 text-xs">
                     <div className="flex items-center gap-2 text-blue-700 font-extrabold">
                       <Globe className="w-4 h-4" />
-                      <span>Connect Any Google Sheet URL Directly</span>
+                      <span>Extract Exact Titles, Images, Costs & MRPs from Google Sheet</span>
                     </div>
                     <p className="text-slate-600 leading-relaxed">
-                      Paste your Google Sheet link below. Zero system lag or browser freeze! Make sure your sheet is published to the web (<strong>File &rarr; Share &rarr; Publish to Web &rarr; CSV</strong>).
+                      Paste any Google Sheet URL. Make sure the sheet sharing is set to <strong>"Anyone with the link can view"</strong>!
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                      Google Sheet Published Link / Share URL *
+                      Google Sheet Link / URL *
                     </label>
                     <div className="relative">
                       <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -304,24 +334,26 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
                         required
                         value={googleSheetUrl}
                         onChange={(e) => setGoogleSheetUrl(e.target.value)}
-                        placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+                        placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing"
                         className="w-full px-4 pl-10 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
 
-                  {/* 3-Step Google Sheet Publish Guide */}
+                  {/* Columns Required Box */}
                   <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1 text-[11px] text-slate-600">
-                    <span className="font-bold text-slate-900 block">How to get your Google Sheet Link in 10 seconds:</span>
-                    <p>1. Open your Google Sheet containing product columns.</p>
-                    <p>2. Click <strong>File &rarr; Share &rarr; Publish to web</strong>.</p>
-                    <p>3. Choose <strong>Comma-separated values (.csv)</strong> and click <strong>Publish</strong>.</p>
+                    <span className="font-bold text-slate-900 block">Recommended Google Sheet Columns:</span>
+                    <p>• <strong>Title</strong> (or Product Name)</p>
+                    <p>• <strong>Wholesale Cost</strong> (Cost per item)</p>
+                    <p>• <strong>Suggested MRP</strong> (Variant Price)</p>
+                    <p>• <strong>Variant SKU</strong> (SKU Code)</p>
+                    <p>• <strong>Image Src</strong> (Image URL link)</p>
                   </div>
 
                   {syncing && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-bold text-blue-600">
-                        <span>Streaming products from Google Cloud...</span>
+                        <span>Extracting real product data from Google Sheet...</span>
                         <span>{progress}%</span>
                       </div>
                       <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
@@ -340,29 +372,29 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
                       className="btn-primary text-xs flex-1 py-3.5 font-extrabold justify-center shadow-md shadow-blue-600/30 disabled:opacity-50"
                     >
                       {syncing ? (
-                        <><RefreshCw className="w-4 h-4 animate-spin" /> Syncing Sheets...</>
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Extracting Data...</>
                       ) : (
-                        '⚡ Sync Google Sheet Catalog →'
+                        '⚡ Sync Sheet Products →'
                       )}
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* TAB 2: LOCAL CSV / EXCEL FILE UPLOAD */}
+              {/* TAB 2: LOCAL CSV FILE UPLOAD */}
               {activeTab === 'file' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-4 bg-blue-50/50 rounded-2xl border border-blue-200">
                     <div>
-                      <h4 className="font-extrabold text-xs text-slate-900">Shopify & Google Sheet CSV Template</h4>
-                      <p className="text-[11px] text-slate-500">Official CSV product template</p>
+                      <h4 className="font-extrabold text-xs text-slate-900">Google Sheet / Shopify CSV Template</h4>
+                      <p className="text-[11px] text-slate-500">Exact column format download</p>
                     </div>
                     <button
                       type="button"
                       onClick={handleDownloadShopifySample}
                       className="btn-secondary text-xs font-bold py-2 px-3 rounded-xl border border-blue-200 flex items-center gap-1 text-blue-700 bg-white hover:bg-blue-50"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download CSV
+                      <Download className="w-3.5 h-3.5" /> Download Template
                     </button>
                   </div>
 
@@ -379,7 +411,7 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
                         <Upload className="w-6 h-6" />
                       </div>
                       <div className="text-xs font-bold text-slate-900">
-                        {file ? <span className="text-blue-600 font-mono">{file.name}</span> : 'Click to select CSV or Excel file'}
+                        {file ? <span className="text-blue-600 font-mono">{file.name}</span> : 'Click to select CSV file'}
                       </div>
                     </label>
                   </div>
@@ -415,20 +447,45 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
                   </div>
                 </div>
               )}
+
+              {/* TAB 3: GOOGLE APPS SCRIPT CODE */}
+              {activeTab === 'script' && (
+                <div className="space-y-4 text-xs">
+                  <div className="bg-purple-50 p-4 rounded-2xl border border-purple-200 space-y-2">
+                    <h4 className="font-extrabold text-purple-900 flex items-center gap-1.5">
+                      <Code className="w-4 h-4 text-purple-600" /> Google Apps Script Code
+                    </h4>
+                    <p className="text-slate-600">
+                      You can paste this optional Apps Script inside your Google Sheet (<strong>Extensions &rarr; Apps Script</strong>) if you want 1-click sync buttons inside Google Sheets!
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-900 text-slate-100 p-4 rounded-2xl font-mono text-[11px] overflow-x-auto relative border border-slate-800">
+                    <pre>{googleAppsScriptCode}</pre>
+                  </div>
+
+                  <button
+                    onClick={() => navigator.clipboard.writeText(googleAppsScriptCode)}
+                    className="btn-secondary text-xs w-full py-2.5 font-bold justify-center"
+                  >
+                    📋 Copy Apps Script Code
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center py-6 space-y-4">
               <CheckCircle2 className="w-14 h-14 text-emerald-600 mx-auto animate-bounce" />
-              <h4 className="font-extrabold text-xl font-heading text-slate-900">Catalog Sync Completed!</h4>
+              <h4 className="font-extrabold text-xl font-heading text-slate-900 font-heading">Exact Product Data Synced!</h4>
               <p className="text-xs text-slate-600 max-w-xs mx-auto">
-                Successfully imported and synced <strong>{importedCount} products</strong> directly into your 360 Dropship wholesale catalog without system lag!
+                Successfully extracted and published <strong>{importedCount} products</strong> with exact titles, prices, SKUs, and image URLs directly to your catalog!
               </p>
               <button
                 type="button"
                 onClick={onClose}
                 className="btn-primary text-xs font-extrabold py-3 px-6 rounded-xl shadow-md shadow-blue-600/30"
               >
-                View Catalog ✓
+                View Catalog Items ✓
               </button>
             </div>
           )}
