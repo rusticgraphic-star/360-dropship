@@ -70,7 +70,38 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
     const idxSku = findIndex(['variant sku', 'sku', 'product code', 'code']);
     const idxImage = findIndex(['image src', 'image url', 'image', 'photo', 'picture']);
     const idxBody = findIndex(['body (html)', 'description', 'body', 'details']);
-      const idxType = findIndex(['type', 'category', 'cat', 'vendor', 'department', 'group']);
+    const idxType = findIndex(['type', 'category', 'cat', 'vendor', 'department', 'group']);
+
+    const parsedProducts = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseLine(lines[i]);
+      if (!row || row.length === 0) continue;
+
+      // Title extraction
+      let title = idxTitle !== -1 && row[idxTitle] ? row[idxTitle] : (row[1] || row[0]);
+      if (!title || title.toLowerCase() === 'title' || title.toLowerCase() === 'name') continue;
+
+      // Wholesale Cost extraction
+      let rawCost = idxCost !== -1 && row[idxCost] ? row[idxCost] : (row[2] || '350');
+      let costVal = parseFloat(rawCost.replace(/[^0-9.]/g, ''));
+      if (isNaN(costVal) || costVal <= 0) costVal = 350;
+
+      // Suggested MRP / Selling Price extraction
+      let rawPrice = idxPrice !== -1 && row[idxPrice] ? row[idxPrice] : (row[4] || row[3] || '1299');
+      let priceVal = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+      if (isNaN(priceVal) || priceVal <= 0) priceVal = costVal + 600;
+
+      // SKU extraction
+      let skuVal = idxSku !== -1 && row[idxSku] ? row[idxSku] : `SKU-GS-${Date.now()}-${i}`;
+
+      // Image URL extraction
+      let imgVal = idxImage !== -1 && row[idxImage] ? row[idxImage] : '';
+      if (!imgVal || !imgVal.startsWith('http')) {
+        // Look for any cell containing http
+        const httpCell = row.find(c => c && c.startsWith('http'));
+        imgVal = httpCell || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80";
+      }
 
       // Description & Category
       let descVal = idxBody !== -1 && row[idxBody] ? row[idxBody] : "Imported wholesale product.";
