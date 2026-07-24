@@ -168,6 +168,57 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       let rawInput = googleSheetUrl.trim();
       let csvUrl = rawInput;
 
+      // Check if input is a Google Apps Script Exec URL or Deployment ID
+      if (rawInput.includes('script.google.com/macros/s/') || rawInput.startsWith('AKfycb')) {
+        let execUrl = rawInput;
+        if (!rawInput.includes('http')) {
+          execUrl = `https://script.google.com/macros/s/${rawInput}/exec`;
+        }
+
+        setProgress(50);
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(execUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error('Could not connect to Google Apps Script Deployment Webhook.');
+        
+        const json = await res.json();
+        let productsParsed = [];
+
+        if (Array.isArray(json)) {
+          productsParsed = json;
+        } else if (json && Array.isArray(json.products)) {
+          productsParsed = json.products;
+        } else if (typeof json === 'string') {
+          productsParsed = parseCSV(json);
+        }
+
+        if (productsParsed.length === 0) {
+          throw new Error('Apps Script returned 0 products. Make sure your Apps Script doGet() or doPost() returns product data.');
+        }
+
+        // Format parsed products
+        const formatted = productsParsed.map((p, i) => ({
+          id: p.id || `PROD-GS-${Date.now()}-${i}`,
+          name: p.name || p.title || `Product #${i + 1}`,
+          category: p.category || p.type || 'General Catalog',
+          wholesalePrice: parseFloat(p.wholesalePrice || p.cost || 350),
+          shippingFee: 75,
+          suggestedMrp: parseFloat(p.suggestedMrp || p.price || 1299),
+          stock: 500,
+          rating: 4.8,
+          image: p.image || (Array.isArray(p.images) ? p.images[0] : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80"),
+          images: Array.isArray(p.images) ? p.images : [p.image].filter(Boolean),
+          sku: p.sku || `SKU-GS-${Date.now()}-${i}`,
+          description: p.description || "Imported product."
+        }));
+
+        setProgress(100);
+        setSyncing(false);
+        setUploadSuccess(true);
+        setImportedCount(formatted.length);
+        if (onBulkUploadSuccess) onBulkUploadSuccess(formatted);
+        return;
+      }
+
       // Extract Sheet ID if standard Google Sheets URL is provided
       if (rawInput.includes('docs.google.com/spreadsheets/d/')) {
         const match = rawInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
@@ -382,16 +433,16 @@ function onOpen() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                      Google Sheet Link / URL *
+                      Google Sheet URL or Apps Script Webhook Exec URL / Deployment ID *
                     </label>
                     <div className="relative">
                       <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                       <input
-                        type="url"
+                        type="text"
                         required
                         value={googleSheetUrl}
                         onChange={(e) => setGoogleSheetUrl(e.target.value)}
-                        placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing"
+                        placeholder="https://script.google.com/macros/s/AKfycbx.../exec OR Sheet URL"
                         className="w-full px-4 pl-10 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500"
                       />
                     </div>
