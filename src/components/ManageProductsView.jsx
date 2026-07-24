@@ -49,16 +49,13 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
     }, 1800);
   };
 
-  // Sample multi-image thumbnails gallery generator
+  // Multi-image thumbnails gallery generator
   const getProductGallery = (prod) => {
     if (!prod) return [];
-    return [
-      prod.image,
-      "https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=500&auto=format&fit=crop&q=80"
-    ];
+    if (prod.images && Array.isArray(prod.images) && prod.images.length > 0) {
+      return prod.images;
+    }
+    return [prod.image];
   };
 
   return (
