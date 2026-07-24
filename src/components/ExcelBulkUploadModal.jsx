@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { 
   X, FileSpreadsheet, Upload, Download, CheckCircle2, AlertCircle, 
-  RefreshCw, ArrowRight, FileCheck, Globe, Link2, ExternalLink, Sparkles, Code
+  RefreshCw, ArrowRight, FileCheck, Globe, Link2, ExternalLink, Sparkles, Code, Zap
 } from 'lucide-react';
 
 export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSuccess }) {
-  const [activeTab, setActiveTab] = useState('gsheet'); // 'gsheet', 'file', or 'script'
+  const [activeTab, setActiveTab] = useState('webapp'); // 'webapp', 'gsheet', 'file', or 'script'
+  const [webAppUrl, setWebAppUrl] = useState('');
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [file, setFile] = useState(null);
   
@@ -21,7 +22,6 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
   const parseCSV = (text) => {
     if (!text || typeof text !== 'string') return [];
 
-    // Split rows properly handling quoted lines
     const lines = [];
     let currentLine = '';
     let inQuotes = false;
@@ -78,30 +78,22 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       const row = parseLine(lines[i]);
       if (!row || row.length === 0) continue;
 
-      // Title extraction
       let title = idxTitle !== -1 && row[idxTitle] ? row[idxTitle] : (row[1] || row[0]);
       if (!title || title.toLowerCase() === 'title' || title.toLowerCase() === 'name') continue;
 
-      // Wholesale Cost extraction
       let rawCost = idxCost !== -1 && row[idxCost] ? row[idxCost] : (row[2] || '350');
       let costVal = parseFloat(rawCost.replace(/[^0-9.]/g, ''));
       if (isNaN(costVal) || costVal <= 0) costVal = 350;
 
-      // Suggested MRP / Selling Price extraction
       let rawPrice = idxPrice !== -1 && row[idxPrice] ? row[idxPrice] : (row[4] || row[3] || '1299');
       let priceVal = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
       if (isNaN(priceVal) || priceVal <= 0) priceVal = costVal + 600;
 
-      // SKU extraction
       let skuVal = idxSku !== -1 && row[idxSku] ? row[idxSku] : `SKU-GS-${Date.now()}-${i}`;
 
-      // Multi-image URL extraction (supports Image 1, Image 2, Image 3 or comma/space separated URLs)
       const extractedImages = [];
-      
-      // 1. Search in all cells of row for http URLs
       row.forEach(cell => {
         if (cell && typeof cell === 'string' && cell.startsWith('http')) {
-          // Check if multiple URLs are comma-separated
           const urls = cell.split(/[\s,]+/).filter(u => u.startsWith('http'));
           urls.forEach(u => {
             if (!extractedImages.includes(u)) extractedImages.push(u);
@@ -112,11 +104,9 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       const primaryImage = extractedImages[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80";
       if (extractedImages.length === 0) extractedImages.push(primaryImage);
 
-      // Description & Category
       let descVal = idxBody !== -1 && row[idxBody] ? row[idxBody] : "Imported wholesale product.";
       let typeVal = idxType !== -1 && row[idxType] ? row[idxType] : '';
 
-      // Intelligent category fallback based on product title if category column is empty
       if (!typeVal) {
         const lowerTitle = title.toLowerCase();
         if (lowerTitle.includes('watch') || lowerTitle.includes('headphone') || lowerTitle.includes('cam') || lowerTitle.includes('led') || lowerTitle.includes('usb') || lowerTitle.includes('phone')) {
@@ -155,6 +145,69 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
     return parsedProducts;
   };
 
+  // WEBAPP EXEC URL HANDLER
+  const handleWebAppSync = async (e) => {
+    e.preventDefault();
+    if (!webAppUrl) return;
+
+    setSyncing(true);
+    setProgress(20);
+    setErrorMessage('');
+
+    try {
+      let rawInput = webAppUrl.trim();
+      let execUrl = rawInput;
+      if (!rawInput.includes('http')) {
+        execUrl = `https://script.google.com/macros/s/${rawInput}/exec`;
+      }
+
+      setProgress(50);
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(execUrl)}`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('Could not connect to Google Sheet WebApp URL.');
+      
+      const json = await res.json();
+      let productsParsed = [];
+
+      if (Array.isArray(json)) {
+        productsParsed = json;
+      } else if (json && Array.isArray(json.products)) {
+        productsParsed = json.products;
+      } else if (typeof json === 'string') {
+        productsParsed = parseCSV(json);
+      }
+
+      if (productsParsed.length === 0) {
+        throw new Error('WebApp returned 0 products. Make sure your Apps Script doGet() returns product data.');
+      }
+
+      const formatted = productsParsed.map((p, i) => ({
+        id: p.id || `PROD-GS-${Date.now()}-${i}`,
+        name: p.name || p.title || `Product #${i + 1}`,
+        category: p.category || p.type || 'General Catalog',
+        wholesalePrice: parseFloat(p.wholesalePrice || p.cost || 350),
+        shippingFee: 75,
+        suggestedMrp: parseFloat(p.suggestedMrp || p.price || 1299),
+        stock: 500,
+        rating: 4.8,
+        image: p.image || (Array.isArray(p.images) ? p.images[0] : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80"),
+        images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image].filter(Boolean),
+        sku: p.sku || `SKU-GS-${Date.now()}-${i}`,
+        description: p.description || "Imported product."
+      }));
+
+      setProgress(100);
+      setSyncing(false);
+      setUploadSuccess(true);
+      setImportedCount(formatted.length);
+      if (onBulkUploadSuccess) onBulkUploadSuccess(formatted);
+    } catch (err) {
+      console.error('WebApp Sync Error:', err);
+      setSyncing(false);
+      setErrorMessage(err.message || 'Failed to fetch Google Sheet WebApp data.');
+    }
+  };
+
   // GOOGLE SHEETS LIVE SYNC HANDLER
   const handleGoogleSheetsSync = async (e) => {
     e.preventDefault();
@@ -168,63 +221,10 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       let rawInput = googleSheetUrl.trim();
       let csvUrl = rawInput;
 
-      // Check if input is a Google Apps Script Exec URL or Deployment ID
-      if (rawInput.includes('script.google.com/macros/s/') || rawInput.startsWith('AKfycb')) {
-        let execUrl = rawInput;
-        if (!rawInput.includes('http')) {
-          execUrl = `https://script.google.com/macros/s/${rawInput}/exec`;
-        }
-
-        setProgress(50);
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(execUrl)}`;
-        const res = await fetch(proxyUrl);
-        if (!res.ok) throw new Error('Could not connect to Google Apps Script Deployment Webhook.');
-        
-        const json = await res.json();
-        let productsParsed = [];
-
-        if (Array.isArray(json)) {
-          productsParsed = json;
-        } else if (json && Array.isArray(json.products)) {
-          productsParsed = json.products;
-        } else if (typeof json === 'string') {
-          productsParsed = parseCSV(json);
-        }
-
-        if (productsParsed.length === 0) {
-          throw new Error('Apps Script returned 0 products. Make sure your Apps Script doGet() or doPost() returns product data.');
-        }
-
-        // Format parsed products
-        const formatted = productsParsed.map((p, i) => ({
-          id: p.id || `PROD-GS-${Date.now()}-${i}`,
-          name: p.name || p.title || `Product #${i + 1}`,
-          category: p.category || p.type || 'General Catalog',
-          wholesalePrice: parseFloat(p.wholesalePrice || p.cost || 350),
-          shippingFee: 75,
-          suggestedMrp: parseFloat(p.suggestedMrp || p.price || 1299),
-          stock: 500,
-          rating: 4.8,
-          image: p.image || (Array.isArray(p.images) ? p.images[0] : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80"),
-          images: Array.isArray(p.images) ? p.images : [p.image].filter(Boolean),
-          sku: p.sku || `SKU-GS-${Date.now()}-${i}`,
-          description: p.description || "Imported product."
-        }));
-
-        setProgress(100);
-        setSyncing(false);
-        setUploadSuccess(true);
-        setImportedCount(formatted.length);
-        if (onBulkUploadSuccess) onBulkUploadSuccess(formatted);
-        return;
-      }
-
-      // Extract Sheet ID if standard Google Sheets URL is provided
       if (rawInput.includes('docs.google.com/spreadsheets/d/')) {
         const match = rawInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (match && match[1]) {
           const sheetId = match[1];
-          // Use Google Visualization API CSV export endpoint (100% reliable format output)
           csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
         }
       }
@@ -232,7 +232,6 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       setProgress(40);
       
       let csvText = '';
-      // Try CORS proxies to fetch Google Sheet CSV content
       const proxies = [
         `https://api.allorigins.win/raw?url=${encodeURIComponent(csvUrl)}`,
         `https://corsproxy.io/?${encodeURIComponent(csvUrl)}`,
@@ -320,35 +319,38 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
   };
 
   const googleAppsScriptCode = `/**
- * 360 Dropship Network - Google Apps Script (Multi-Image Support)
- * Columns: Title, Category, Wholesale Cost, Suggested MRP, Variant SKU, Image 1, Image 2, Image 3, Description
+ * 360 Dropship Network - Google Apps Script WebApp
+ * Columns: Title (A), Category (B), Wholesale Cost (C), Suggested MRP (D), SKU (E), Image 1 (F), Image 2 (G), Image 3 (H), Description (I)
  */
-function syncMultiImageCatalog() {
+function doGet(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var data = sheet.getDataRange().getValues();
-  
-  if (data.length < 2) {
-    SpreadsheetApp.getUi().alert("No products found in sheet!");
-    return;
+  var products = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue; // Skip empty rows
+
+    products.push({
+      name: row[0],
+      category: row[1] || 'General Catalog',
+      wholesalePrice: Number(row[2]) || 350,
+      suggestedMrp: Number(row[3]) || 1299,
+      sku: row[4] || ('SKU-GS-' + i),
+      image: row[5] || '',
+      images: [row[5], row[6], row[7]].filter(Boolean),
+      description: row[8] || 'Imported product'
+    });
   }
 
-  var spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  var shareUrl = "https://docs.google.com/spreadsheets/d/" + spreadsheetId + "/edit?usp=sharing";
-
-  var html = HtmlService.createHtmlOutput(
-    "<h3>✅ 360 Dropship Multi-Image Sync Ready!</h3>" +
-    "<p>Products in Sheet: <b>" + (data.length - 1) + "</b> (with 2-3 images)</p>" +
-    "<p>Copy your Google Sheet URL into 360 Dropship Admin Importer:</p>" +
-    "<textarea style='width:100%;height:65px;'>" + shareUrl + "</textarea>"
-  ).setWidth(480).setHeight(230);
-
-  SpreadsheetApp.getUi().showModalDialog(html, "360 Dropship Cloud Sync");
+  return ContentService.createTextOutput(JSON.stringify(products))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("🚀 360 Dropship")
-    .addItem("Sync Multi-Image Catalog", "syncMultiImageCatalog")
+    .addItem("Sync Catalog to Website", "doGet")
     .addToUi();
 }`;
 
@@ -360,10 +362,10 @@ function onOpen() {
         <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
             <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1 w-fit">
-              <Sparkles className="w-3 h-3" /> EXACT GOOGLE SHEET DATA PARSER
+              <Sparkles className="w-3 h-3" /> GOOGLE SHEET WEBAPP & CSV IMPORTER
             </span>
             <h3 className="text-xl font-extrabold font-heading mt-1">
-              Google Sheet & CSV Product Importer
+              Google Sheet WebApp & CSV Sync
             </h3>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -372,38 +374,49 @@ function onOpen() {
         </div>
 
         {/* Tab Selection Bar */}
-        <div className="flex border-b border-slate-200 bg-slate-50 p-2 gap-2">
+        <div className="flex border-b border-slate-200 bg-slate-50 p-2 gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => { setActiveTab('webapp'); setErrorMessage(''); }}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'webapp'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Zap className="w-4 h-4" /> WebApp URL Sync
+          </button>
+
           <button
             onClick={() => { setActiveTab('gsheet'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'gsheet'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Globe className="w-4 h-4" /> Live Google Sheet URL
+            <Globe className="w-4 h-4" /> Live Sheet URL
           </button>
 
           <button
             onClick={() => { setActiveTab('file'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'file'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4" /> CSV File Upload
+            <FileSpreadsheet className="w-4 h-4" /> CSV File
           </button>
 
           <button
             onClick={() => { setActiveTab('script'); setErrorMessage(''); }}
-            className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'script'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Code className="w-4 h-4" /> Apps Script
+            <Code className="w-4 h-4" /> Apps Script Code
           </button>
         </div>
 
@@ -418,44 +431,95 @@ function onOpen() {
 
           {!uploadSuccess ? (
             <>
-              {/* TAB 1: GOOGLE SHEETS LIVE SYNC */}
-              {activeTab === 'gsheet' && (
-                <form onSubmit={handleGoogleSheetsSync} className="space-y-4">
-                  <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-200 space-y-2 text-xs">
-                    <div className="flex items-center gap-2 text-blue-700 font-extrabold">
-                      <Globe className="w-4 h-4" />
-                      <span>Extract Exact Titles, Images, Costs & MRPs from Google Sheet</span>
+              {/* TAB 1: GOOGLE APPS SCRIPT WEBAPP URL SYNC */}
+              {activeTab === 'webapp' && (
+                <form onSubmit={handleWebAppSync} className="space-y-4">
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-800 font-extrabold">
+                      <Zap className="w-4 h-4 text-emerald-600" />
+                      <span>Paste your Google Apps Script WebApp URL</span>
                     </div>
                     <p className="text-slate-600 leading-relaxed">
-                      Paste any Google Sheet URL. Make sure the sheet sharing is set to <strong>"Anyone with the link can view"</strong>!
+                      Paste the WebApp URL generated from Google Apps Script (<strong>Deploy &rarr; New deployment &rarr; Web app</strong>).
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                      Google Sheet URL or Apps Script Webhook Exec URL / Deployment ID *
+                      Google Sheet WebApp Exec URL / Deployment ID *
                     </label>
                     <div className="relative">
                       <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                       <input
                         type="text"
                         required
-                        value={googleSheetUrl}
-                        onChange={(e) => setGoogleSheetUrl(e.target.value)}
-                        placeholder="https://script.google.com/macros/s/AKfycbx.../exec OR Sheet URL"
-                        className="w-full px-4 pl-10 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500"
+                        value={webAppUrl}
+                        onChange={(e) => setWebAppUrl(e.target.value)}
+                        placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                        className="w-full px-4 pl-10 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                   </div>
 
-                  {/* Columns Required Box */}
-                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1 text-[11px] text-slate-600">
-                    <span className="font-bold text-slate-900 block">Recommended Google Sheet Columns:</span>
-                    <p>• <strong>Title</strong> (or Product Name)</p>
-                    <p>• <strong>Wholesale Cost</strong> (Cost per item)</p>
-                    <p>• <strong>Suggested MRP</strong> (Variant Price)</p>
-                    <p>• <strong>Variant SKU</strong> (SKU Code)</p>
-                    <p>• <strong>Image Src</strong> (Image URL link)</p>
+                  {syncing && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-emerald-700">
+                        <span>Connecting to Google Sheet WebApp...</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-600 transition-all duration-300" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={onClose} className="btn-secondary text-xs flex-1 py-3">
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!webAppUrl || syncing}
+                      className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-xs flex-1 py-3.5 font-extrabold justify-center shadow-md shadow-emerald-600/30 disabled:opacity-50"
+                    >
+                      {syncing ? (
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Fetching Products...</>
+                      ) : (
+                        '⚡ Sync WebApp Products →'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* TAB 2: GOOGLE SHEETS LIVE URL SYNC */}
+              {activeTab === 'gsheet' && (
+                <form onSubmit={handleGoogleSheetsSync} className="space-y-4">
+                  <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-200 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 text-blue-700 font-extrabold">
+                      <Globe className="w-4 h-4" />
+                      <span>Extract Titles, Images, Costs & MRPs from Google Sheet Link</span>
+                    </div>
+                    <p className="text-slate-600 leading-relaxed">
+                      Paste any Google Sheet URL. Make sure sheet sharing is set to <strong>"Anyone with the link can view"</strong>!
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                      Google Sheet Public Share Link *
+                    </label>
+                    <div className="relative">
+                      <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="url"
+                        required
+                        value={googleSheetUrl}
+                        onChange={(e) => setGoogleSheetUrl(e.target.value)}
+                        placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing"
+                        className="w-full px-4 pl-10 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
 
                   {syncing && (
@@ -489,7 +553,7 @@ function onOpen() {
                 </form>
               )}
 
-              {/* TAB 2: LOCAL CSV FILE UPLOAD */}
+              {/* TAB 3: LOCAL CSV FILE UPLOAD */}
               {activeTab === 'file' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-4 bg-blue-50/50 rounded-2xl border border-blue-200">
@@ -556,15 +620,15 @@ function onOpen() {
                 </div>
               )}
 
-              {/* TAB 3: GOOGLE APPS SCRIPT CODE */}
+              {/* TAB 4: GOOGLE APPS SCRIPT CODE */}
               {activeTab === 'script' && (
                 <div className="space-y-4 text-xs">
                   <div className="bg-purple-50 p-4 rounded-2xl border border-purple-200 space-y-2">
                     <h4 className="font-extrabold text-purple-900 flex items-center gap-1.5">
-                      <Code className="w-4 h-4 text-purple-600" /> Google Apps Script Code
+                      <Code className="w-4 h-4 text-purple-600" /> Google Apps Script WebApp Code
                     </h4>
                     <p className="text-slate-600">
-                      You can paste this optional Apps Script inside your Google Sheet (<strong>Extensions &rarr; Apps Script</strong>) if you want 1-click sync buttons inside Google Sheets!
+                      Paste this script into <strong>Extensions &rarr; Apps Script</strong>, click <strong>Deploy &rarr; New deployment &rarr; Web app</strong>, and copy the WebApp URL into Tab 1!
                     </p>
                   </div>
 
@@ -576,7 +640,7 @@ function onOpen() {
                     onClick={() => navigator.clipboard.writeText(googleAppsScriptCode)}
                     className="btn-secondary text-xs w-full py-2.5 font-bold justify-center"
                   >
-                    📋 Copy Apps Script Code
+                    📋 Copy WebApp Apps Script Code
                   </button>
                 </div>
               )}
