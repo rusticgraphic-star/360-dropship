@@ -95,13 +95,22 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
       // SKU extraction
       let skuVal = idxSku !== -1 && row[idxSku] ? row[idxSku] : `SKU-GS-${Date.now()}-${i}`;
 
-      // Image URL extraction
-      let imgVal = idxImage !== -1 && row[idxImage] ? row[idxImage] : '';
-      if (!imgVal || !imgVal.startsWith('http')) {
-        // Look for any cell containing http
-        const httpCell = row.find(c => c && c.startsWith('http'));
-        imgVal = httpCell || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80";
-      }
+      // Multi-image URL extraction (supports Image 1, Image 2, Image 3 or comma/space separated URLs)
+      const extractedImages = [];
+      
+      // 1. Search in all cells of row for http URLs
+      row.forEach(cell => {
+        if (cell && typeof cell === 'string' && cell.startsWith('http')) {
+          // Check if multiple URLs are comma-separated
+          const urls = cell.split(/[\s,]+/).filter(u => u.startsWith('http'));
+          urls.forEach(u => {
+            if (!extractedImages.includes(u)) extractedImages.push(u);
+          });
+        }
+      });
+
+      const primaryImage = extractedImages[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80";
+      if (extractedImages.length === 0) extractedImages.push(primaryImage);
 
       // Description & Category
       let descVal = idxBody !== -1 && row[idxBody] ? row[idxBody] : "Imported wholesale product.";
@@ -136,7 +145,8 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
         suggestedMrp: priceVal,
         stock: 500,
         rating: 4.8,
-        image: imgVal,
+        image: primaryImage,
+        images: extractedImages,
         sku: skuVal,
         description: descVal
       });
