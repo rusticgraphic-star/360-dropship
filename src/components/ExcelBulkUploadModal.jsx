@@ -268,10 +268,37 @@ export default function ExcelBulkUploadModal({ isOpen, onClose, onBulkUploadSucc
     document.body.removeChild(link);
   };
 
-  const googleAppsScriptCode = `function syncCatalogTo360() {
+  const googleAppsScriptCode = `/**
+ * 360 Dropship Network - Google Apps Script (Multi-Image Support)
+ * Columns: Title, Category, Wholesale Cost, Suggested MRP, Variant SKU, Image 1, Image 2, Image 3, Description
+ */
+function syncMultiImageCatalog() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var data = sheet.getDataRange().getValues();
-  Logger.log("Exported " + (data.length - 1) + " products for 360 Dropship!");
+  
+  if (data.length < 2) {
+    SpreadsheetApp.getUi().alert("No products found in sheet!");
+    return;
+  }
+
+  var spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  var shareUrl = "https://docs.google.com/spreadsheets/d/" + spreadsheetId + "/edit?usp=sharing";
+
+  var html = HtmlService.createHtmlOutput(
+    "<h3>✅ 360 Dropship Multi-Image Sync Ready!</h3>" +
+    "<p>Products in Sheet: <b>" + (data.length - 1) + "</b> (with 2-3 images)</p>" +
+    "<p>Copy your Google Sheet URL into 360 Dropship Admin Importer:</p>" +
+    "<textarea style='width:100%;height:65px;'>" + shareUrl + "</textarea>"
+  ).setWidth(480).setHeight(230);
+
+  SpreadsheetApp.getUi().showModalDialog(html, "360 Dropship Cloud Sync");
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("🚀 360 Dropship")
+    .addItem("Sync Multi-Image Catalog", "syncMultiImageCatalog")
+    .addToUi();
 }`;
 
   return (
