@@ -53,7 +53,7 @@ export default function Header({ walletBalance, onOpenRechargeModal, onSelectTab
           </div>
           <div className="hidden sm:block">
             <span className="text-[10px] text-slate-500 font-bold block uppercase leading-none">Meta Ads Wallet</span>
-            <span className="text-xs font-black text-slate-900 font-heading">₹{walletBalance.toLocaleString('en-IN')}</span>
+            <span className="text-xs font-black text-slate-900 font-heading">₹{(walletBalance || 0).toLocaleString('en-IN')}</span>
           </div>
           <button
             onClick={onOpenRechargeModal}
