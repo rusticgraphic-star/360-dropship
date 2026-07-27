@@ -45,7 +45,7 @@ export const dbService = {
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
 
-    const existingUser = users.find(u => (email && u.email.toLowerCase() === email.toLowerCase()));
+    const existingUser = users.find(u => (email && u && u.email && typeof u.email === 'string' && u.email.toLowerCase() === email.toLowerCase()));
     if (existingUser) {
       safeStorage.setItem(DB_SESSION_KEY, JSON.stringify(existingUser));
       return { success: true, user: existingUser, isNew: false };
@@ -57,9 +57,10 @@ export const dbService = {
     const newUser = {
       id: userId,
       name: isMasterAdmin ? 'System Agency Admin' : userName,
-      email: email.toLowerCase(),
+      email: (email || 'user@gmail.com').toLowerCase(),
       phone: phone || '',
       role: isMasterAdmin ? 'admin' : 'dropshipper',
+      status: isMasterAdmin ? 'ACTIVE' : 'INACTIVE',
       storeDomain: '',
       kycStatus: 'PENDING',
       walletBalance: 0,
@@ -70,6 +71,22 @@ export const dbService = {
     users.push(newUser);
     safeStorage.setItem(DB_USERS_KEY, JSON.stringify(users));
     safeStorage.setItem(DB_SESSION_KEY, JSON.stringify(newUser));
+
+    // Also sync to sellers list for Admin Management
+    try {
+      const sellers = this.getSellers();
+      if (Array.isArray(sellers) && !sellers.some(s => s && s.email && s.email.toLowerCase() === newUser.email.toLowerCase())) {
+        sellers.push({
+          id: userId,
+          name: newUser.name,
+          email: newUser.email,
+          phone: newUser.phone,
+          status: newUser.status,
+          createdAt: new Date().toISOString().split('T')[0]
+        });
+        this.saveSellers(sellers);
+      }
+    } catch (e) {}
 
     // Initialize Isolated User Data
     safeStorage.setItem(`360_orders_${userId}`, JSON.stringify([]));
@@ -88,7 +105,7 @@ export const dbService = {
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
 
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const user = users.find(u => (email && u && u.email && typeof u.email === 'string' && u.email.toLowerCase() === email.toLowerCase()));
 
     if (!user) {
       return this.signUp({ name: email.split('@')[0], email, password });
@@ -210,6 +227,71 @@ export const dbService = {
     return existing;
   },
 
+  // Admin Settings (WhatsApp Support Number & Approval Config)
+  getAdminSettings() {
+    const str = safeStorage.getItem('360_admin_settings');
+    if (!str) return { whatsappNumber: '+919876543210', autoApprove: false };
+    try { return JSON.parse(str); } catch (e) { return { whatsappNumber: '+919876543210', autoApprove: false }; }
+  },
+
+  saveAdminSettings(settings) {
+    safeStorage.setItem('360_admin_settings', JSON.stringify(settings));
+  },
+
+  // Seller Accounts List & Real User Status Isolation
+  getSellers() {
+    this.init();
+    const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
+    let users = [];
+    try { users = JSON.parse(usersStr); } catch (e) { users = []; }
+
+    // Filter out Admin rustic241@gmail.com
+    const realUsers = users.filter(u => u && u.email && u.email.toLowerCase() !== 'rustic241@gmail.com');
+
+    // Get saved status overrides
+    const statusMapStr = safeStorage.getItem('360_sellers_status_map') || '{}';
+    let statusMap = {};
+    try { statusMap = JSON.parse(statusMapStr); } catch (e) { statusMap = {}; }
+
+    return realUsers.map(u => ({
+      id: u.id,
+      name: u.name || (u.email ? u.email.split('@')[0] : 'Registered Dropshipper'),
+      email: u.email,
+      phone: u.phone || '+91 9876543210',
+      status: statusMap[u.id] || statusMap[u.email] || u.status || 'INACTIVE',
+      createdAt: u.createdAt ? u.createdAt.split('T')[0] : '2026-07-27'
+    }));
+  },
+
+  saveSellers(sellers) {
+    safeStorage.setItem('360_sellers_list', JSON.stringify(sellers));
+  },
+
+  toggleSellerStatus(sellerId) {
+    const statusMapStr = safeStorage.getItem('360_sellers_status_map') || '{}';
+    let statusMap = {};
+    try { statusMap = JSON.parse(statusMapStr); } catch (e) { statusMap = {}; }
+
+    const sellers = this.getSellers();
+    const target = sellers.find(s => s.id === sellerId || s.email === sellerId);
+    if (target) {
+      const newStatus = target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      statusMap[target.id] = newStatus;
+      statusMap[target.email] = newStatus;
+      safeStorage.setItem('360_sellers_status_map', JSON.stringify(statusMap));
+    }
+    return this.getSellers();
+  },
+
+  getSellerStatus(email) {
+    if (!email || typeof email !== 'string') return 'INACTIVE';
+    if (email.toLowerCase() === 'rustic241@gmail.com') return 'ACTIVE';
+    const sellers = this.getSellers();
+    if (!Array.isArray(sellers)) return 'INACTIVE';
+    const found = sellers.find(s => s && s.email && typeof s.email === 'string' && s.email.toLowerCase() === email.toLowerCase());
+    return found ? (found.status || 'INACTIVE') : 'INACTIVE';
+  },
+
   // Deduplicate products list by normalized name
   deduplicate(list) {
     if (!Array.isArray(list)) return [];
@@ -226,21 +308,18 @@ export const dbService = {
     return result;
   },
 
-  // Product Catalog Persistence
+  // Product Catalog Persistence (Memory + Safe Storage)
   getProducts(fallbackProducts = []) {
-    const str = safeStorage.getItem('360_wholesale_products');
-    if (str) {
-      try {
+    try {
+      const str = safeStorage.getItem('360_wholesale_products');
+      if (str) {
         const parsed = JSON.parse(str);
-        if (Array.isArray(parsed) && parsed.length > 50) {
-          const clean = this.deduplicate(parsed);
-          if (clean.length > 50) return clean;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
         }
-      } catch (e) {}
-    }
-    const cleanFallback = this.deduplicate(fallbackProducts);
-    safeStorage.setItem('360_wholesale_products', JSON.stringify(cleanFallback));
-    return cleanFallback;
+      }
+    } catch (e) {}
+    return Array.isArray(fallbackProducts) ? fallbackProducts : [];
   },
 
   saveProducts(products) {
