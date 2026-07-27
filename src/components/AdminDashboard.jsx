@@ -16,9 +16,46 @@ export default function AdminDashboard({
   onEditProduct,
   onDeleteProducts
 }) {
+  // Admin Security Email & Password Authentication State
+  const [adminEmail, setAdminEmail] = useState(() => localStorage.getItem('360_admin_email') || 'admin@360dropship.in');
+  const [adminPassword, setAdminPassword] = useState(() => localStorage.getItem('360_admin_password') || 'admin123');
+  const [adminEmailInput, setAdminEmailInput] = useState('');
+  const [adminAuthInput, setAdminAuthInput] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => sessionStorage.getItem('360_admin_auth') === 'true');
+  const [authError, setAuthError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [upiIdInput, setUpiIdInput] = useState(agencyUpiId);
   const [upiSaved, setUpiSaved] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState([]);
+
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    if (adminEmailInput.trim().toLowerCase() === adminEmail.toLowerCase() && adminAuthInput.trim() === adminPassword) {
+      setIsAdminAuthenticated(true);
+      sessionStorage.setItem('360_admin_auth', 'true');
+      setAuthError('');
+    } else {
+      setAuthError('Invalid Admin Email or Password. Default: admin@360dropship.in / admin123');
+    }
+  };
+
+  const handleAdminLock = () => {
+    setIsAdminAuthenticated(false);
+    sessionStorage.removeItem('360_admin_auth');
+    setAdminAuthInput('');
+  };
+
+  const handleChangePassword = (e) => {
+    e.preventDefault();
+    if (newAdminPassword.trim().length >= 4) {
+      setAdminPassword(newAdminPassword.trim());
+      localStorage.setItem('360_admin_password', newAdminPassword.trim());
+      setPasswordChangeSuccess(true);
+      setNewAdminPassword('');
+      setTimeout(() => setPasswordChangeSuccess(false), 3000);
+    }
+  };
 
   // Admin Payout Request Approval Mock State
   const [payoutRequests, setPayoutRequests] = useState([
