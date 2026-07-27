@@ -27,7 +27,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
   const handleConnectStore = (e) => {
     e.preventDefault();
-    let cleanedDomain = storeDomain.trim().toLowerCase();
+    let cleanedDomain = storeDomain.trim().toLowerCase().replace(/^https?:\/\//, '');
     if (!cleanedDomain) return;
 
     if (!cleanedDomain.includes('.myshopify.com') && !cleanedDomain.includes('.')) {
@@ -35,24 +35,29 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
     }
 
     setIsConnecting(true);
+
+    // Save connection locally in dbService
+    if (user?.id) {
+      dbService.saveUserShopify(user.id, {
+        isConnected: true,
+        domain: cleanedDomain,
+        token: accessToken || `shpat_${Math.random().toString(36).substring(2, 15)}`,
+        connectedAt: new Date().toISOString()
+      });
+    }
+
     setTimeout(() => {
       setIsConnecting(false);
       setIsConnected(true);
       setStoreDomain(cleanedDomain);
       setSaveSuccess(true);
 
-      // Save connection locally in dbService
-      if (user?.id) {
-        dbService.saveUserShopify(user.id, {
-          isConnected: true,
-          domain: cleanedDomain,
-          token: accessToken || `shpat_${Math.random().toString(36).substring(2, 15)}`,
-          connectedAt: new Date().toISOString()
-        });
-      }
+      // REDIRECT DIRECTLY TO SHOPIFY ADMIN OAUTH PANEL IN NEW TAB
+      const shopifyOAuthUrl = `https://${cleanedDomain}/admin/oauth/authorize`;
+      window.open(shopifyOAuthUrl, '_blank');
 
       setTimeout(() => setSaveSuccess(false), 3500);
-    }, 1200);
+    }, 800);
   };
 
   const handleDisconnect = () => {
