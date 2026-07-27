@@ -280,6 +280,9 @@ export const dbService = {
       statusMap[target.email] = newStatus;
       safeStorage.setItem('360_sellers_status_map', JSON.stringify(statusMap));
     }
+    try {
+      window.dispatchEvent(new Event('sellerStatusChanged'));
+    } catch (e) {}
     return dbService.getSellers();
   },
 
