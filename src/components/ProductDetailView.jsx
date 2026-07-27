@@ -5,7 +5,7 @@ import {
   ExternalLink, Copy, Check
 } from 'lucide-react';
 
-export default function ProductDetailView({ product, onBack, onSelectTab }) {
+export default function ProductDetailView({ product, onBack, onSelectTab, onPushProduct }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [pushedToShopify, setPushedToShopify] = useState(false);
   const [copiedSku, setCopiedSku] = useState(false);
@@ -37,6 +37,9 @@ export default function ProductDetailView({ product, onBack, onSelectTab }) {
   const estMargin = Math.max(0, suggestedMrp - totalCost - (suggestedMrp * 0.05));
 
   const handlePushShopify = () => {
+    if (onPushProduct && product?.id) {
+      onPushProduct(product.id);
+    }
     setPushedToShopify(true);
     setTimeout(() => setPushedToShopify(false), 3000);
   };
