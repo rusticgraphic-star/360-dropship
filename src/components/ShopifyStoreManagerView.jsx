@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Store, CheckCircle2, RefreshCw, Zap, ExternalLink, Key, Link2, ShieldCheck, Copy, ArrowRight, AlertCircle, Unlink, HelpCircle, Check } from 'lucide-react';
+import { Store, CheckCircle2, RefreshCw, Key, AlertCircle, Unlink, HelpCircle, Zap, ExternalLink } from 'lucide-react';
 import { dbService } from '../services/dbService';
 
 export default function ShopifyStoreManagerView({ user, onSelectTab }) {
@@ -10,16 +10,16 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [connectionError, setConnectionError] = useState('');
 
-  // Check for OAuth callback params in URL
+  // Check for OAuth callback params
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search || window.location.hash.split('?')[1] || '');
+    const hashParams = window.location.hash.split('?')[1] || '';
+    const params = new URLSearchParams(hashParams);
     const shopifySuccess = params.get('shopify_success');
     const shopifyShop = params.get('shopify_shop');
     const shopifyToken = params.get('shopify_token');
     const shopifyError = params.get('shopify_error');
 
     if (shopifySuccess && shopifyShop && shopifyToken && user?.id) {
-      // OAuth completed successfully — save the connection
       dbService.saveUserShopify(user.id, {
         isConnected: true,
         domain: shopifyShop,
@@ -31,18 +31,15 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
       setAccessToken(shopifyToken);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 6000);
-
-      // Clean URL
       window.history.replaceState({}, '', '/#/dashboard');
     }
-
     if (shopifyError) {
-      setConnectionError(`Shopify OAuth Error: ${shopifyError}`);
+      setConnectionError(`Shopify Error: ${shopifyError}`);
       window.history.replaceState({}, '', '/#/dashboard');
     }
   }, [user]);
 
-  // Load existing user Shopify connection
+  // Load existing connection
   useEffect(() => {
     if (user?.id) {
       const shopifyData = dbService.getUserShopify(user.id);
@@ -56,12 +53,10 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
   const userPushedProducts = user?.id ? dbService.getUserPushedProducts(user.id) : [];
 
-  // 1-Click OAuth: redirect to our backend API which handles everything
-  // Shopify Custom App Install Link (from Partner Dashboard)
-  const SHOPIFY_INSTALL_URL = 'https://admin.shopify.com/oauth/install_custom_app?client_id=59b669059770244c0513bec02b008c6b&no_redirect=true&signature=eyJleHBpcmVzX2F0IjoxNzg1NzY5NzMyLCJwZXJtYW5lbnRfZG9tYWluIjoicXRuY3FnLXdzLm15c2hvcGlmeS5jb20iLCJjbGllbnRfaWQiOiI1OWI2NjkwNTk3NzAyNDRjMDUxM2JlYzAyYjAwOGM2YiIsInB1cnBvc2UiOiJjdXN0b21fYXBwIiwibWVyY2hhbnRfb3JnYW5pemF0aW9uX2lkIjoyMTg2OTgxNjB9--dab08856cc392c6dcc7a39ea921592b6566fb018';
-
-  const handleOAuthConnect = (e) => {
+  const handleConnectStore = async (e) => {
     e.preventDefault();
+    setConnectionError('');
+
     let cleanedDomain = storeDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
     if (!cleanedDomain) {
       alert('Apna Shopify Store URL daalo (e.g. mystore.myshopify.com)');
@@ -71,25 +66,32 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
       cleanedDomain = `${cleanedDomain}.myshopify.com`;
     }
 
+    const token = accessToken.trim();
+    if (!token || !token.startsWith('shpat_')) {
+      setConnectionError('❌ Invalid token! Token "shpat_" se start hona chahiye. Neeche steps follow karke sahi token paste karo.');
+      return;
+    }
+
     setIsConnecting(true);
 
-    // Save domain locally first
+    // Save connection
     if (user?.id) {
       dbService.saveUserShopify(user.id, {
-        isConnected: false,
+        isConnected: true,
         domain: cleanedDomain,
-        pendingConnect: true,
+        token: token,
         connectedAt: new Date().toISOString()
       });
     }
 
-    // Open Shopify install link — after install, use OAuth to get token
-    window.open(SHOPIFY_INSTALL_URL, '_blank');
-
-    // After opening install link, also trigger OAuth for token exchange
+    // Small delay for UX
     setTimeout(() => {
-      window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(cleanedDomain)}`;
-    }, 2000);
+      setIsConnecting(false);
+      setIsConnected(true);
+      setStoreDomain(cleanedDomain);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 5000);
+    }, 800);
   };
 
   const handleDisconnect = () => {
@@ -117,7 +119,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
         </p>
       </div>
 
-      {/* Connection Overview Card */}
+      {/* Connection Status Card */}
       {isConnected ? (
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-3">
@@ -130,17 +132,12 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
                 <p className="text-xs text-slate-500 font-mono">{storeDomain}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
               <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 w-fit">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 ACTIVE AUTO-SYNC
               </span>
-
-              <button
-                onClick={handleDisconnect}
-                className="text-xs text-rose-600 hover:text-rose-700 font-bold px-3 py-1 bg-rose-50 rounded-full border border-rose-200 flex items-center gap-1"
-              >
+              <button onClick={handleDisconnect} className="text-xs text-rose-600 hover:text-rose-700 font-bold px-3 py-1 bg-rose-50 rounded-full border border-rose-200 flex items-center gap-1">
                 <Unlink className="w-3.5 h-3.5" /> Disconnect
               </button>
             </div>
@@ -151,12 +148,10 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
               <span className="text-slate-500 block mb-1">Live Store Domain</span>
               <span className="font-extrabold text-slate-900 text-sm font-mono truncate block">{storeDomain}</span>
             </div>
-
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
               <span className="text-slate-500 block mb-1">Synced Catalog Items</span>
               <span className="font-extrabold text-blue-600 text-sm font-heading">{userPushedProducts.length} Products Pushed</span>
             </div>
-
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
               <span className="text-slate-500 block mb-1">Order Dispatch Sync</span>
               <span className="font-extrabold text-emerald-600 text-sm font-heading">Instant (&lt; 1s)</span>
@@ -164,10 +159,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button
-              onClick={() => onSelectTab('all-products')}
-              className="btn-primary text-xs py-2.5 px-5 rounded-xl shadow-md flex items-center gap-2"
-            >
+            <button onClick={() => onSelectTab('all-products')} className="btn-primary text-xs py-2.5 px-5 rounded-xl shadow-md flex items-center gap-2">
               Browse Catalog & Push Products →
             </button>
           </div>
@@ -180,31 +172,27 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 text-base font-heading">No Shopify Store Connected</h3>
-              <p className="text-xs text-slate-500">Connect your Shopify store with 1-click OAuth — fully automated, no manual token needed.</p>
+              <p className="text-xs text-slate-500">Neeche apna store domain aur API token paste karke connect karo — 100% FREE!</p>
             </div>
           </div>
-
-          <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-extrabold px-3 py-1 rounded-full shrink-0">
-            DISCONNECTED
-          </span>
+          <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-extrabold px-3 py-1 rounded-full shrink-0">DISCONNECTED</span>
         </div>
       )}
 
-      {/* 1-CLICK OAUTH CONNECTION FORM */}
+      {/* Connect Form */}
       <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-        
         <div className="border-b border-slate-200 pb-4">
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-600" />
-            <h3 className="font-extrabold text-slate-900 text-base font-heading">⚡ 1-Click Shopify Connect</h3>
+            <Key className="w-5 h-5 text-blue-600" />
+            <h3 className="font-extrabold text-slate-900 text-base font-heading">🔗 Connect Your Shopify Store (FREE)</h3>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Apna store domain daalo aur connect karo — backend automatically OAuth handle karega, koi manual token ki zaroorat nahi!</p>
+          <p className="text-xs text-slate-500 mt-1">Apne Shopify Admin se Custom App ka token paste karo — koi charge nahi, unlimited stores!</p>
         </div>
 
         {saveSuccess && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fade-in">
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-            <span>✅ Shopify Store Connected Successfully! Live auto-order routing and catalog push activated.</span>
+            <span>✅ Shopify Store Connected Successfully! Product push & order sync activated.</span>
           </div>
         )}
 
@@ -215,78 +203,110 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
           </div>
         )}
 
-        <form onSubmit={handleOAuthConnect} className="space-y-4">
+        <form onSubmit={handleConnectStore} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Shopify Store Domain *
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              1. Shopify Store Domain *
             </label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  required
-                  value={storeDomain}
-                  onChange={(e) => { setStoreDomain(e.target.value); setConnectionError(''); }}
-                  placeholder="my-fashion-store.myshopify.com"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
-                />
-              </div>
+            <input
+              type="text"
+              required
+              value={storeDomain}
+              onChange={(e) => setStoreDomain(e.target.value)}
+              placeholder="my-brand-store.myshopify.com"
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500 mb-3"
+            />
 
-              <button
-                type="submit"
-                disabled={isConnecting}
-                className="btn-primary text-xs font-extrabold py-3 px-6 rounded-xl shadow-md shadow-blue-600/30 justify-center whitespace-nowrap"
-              >
-                {isConnecting ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Redirecting to Shopify...</>
-                ) : (
-                  '⚡ Connect Store →'
-                )}
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5">
-              Apna Shopify store URL daalo (e.g. <code>mybrand.myshopify.com</code>) aur Connect karo. Shopify permission screen aayegi — approve karo aur done! ✅
-            </p>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              2. Admin API Access Token (shpat_...) *
+            </label>
+            <input
+              type="password"
+              required
+              value={accessToken}
+              onChange={(e) => { setAccessToken(e.target.value); setConnectionError(''); }}
+              placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">Token kaise milega? Neeche step-by-step guide dekho ↓</p>
           </div>
+
+          <button
+            type="submit"
+            disabled={isConnecting}
+            className="btn-primary w-full text-xs font-extrabold py-3.5 rounded-xl shadow-md shadow-blue-600/30 justify-center"
+          >
+            {isConnecting ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" /> Connecting Store...</>
+            ) : (
+              '🔗 Connect Shopify Store ✓'
+            )}
+          </button>
         </form>
       </div>
 
-      {/* HOW IT WORKS */}
+      {/* STEP-BY-STEP GUIDE */}
       <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-xl space-y-6">
         <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
           <div className="p-2.5 bg-blue-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
             <HelpCircle className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-extrabold text-white text-base font-heading">Kaise Kaam Karta Hai? (Automatic)</h3>
-            <p className="text-xs text-slate-400">Poora process automated hai — bas 2 click me done!</p>
+            <h3 className="font-extrabold text-white text-base font-heading">Token Kaise Milega? (5 Easy Steps — FREE!)</h3>
+            <p className="text-xs text-slate-400">Apne Shopify Admin me ye steps follow karo:</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
-            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Step 1</span>
-            <h4 className="font-bold text-slate-200 text-sm">Store URL Daalo</h4>
-            <p className="text-slate-400 leading-relaxed">
-              Upar box me apna Shopify store URL type karo (e.g. <code className="text-cyan-400">mybrand.myshopify.com</code>)
-            </p>
+        <div className="space-y-3 text-xs">
+          {/* Step 1 */}
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 flex gap-3">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase h-fit shrink-0">Step 1</span>
+            <div>
+              <h4 className="font-bold text-slate-200 text-sm mb-1">Shopify Admin Kholo</h4>
+              <p className="text-slate-400">Browser me jao: <code className="text-cyan-400 bg-slate-700 px-1.5 py-0.5 rounded">https://TUMHARA-STORE.myshopify.com/admin</code></p>
+            </div>
           </div>
 
-          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
-            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Step 2</span>
-            <h4 className="font-bold text-slate-200 text-sm">Shopify Permission Approve Karo</h4>
-            <p className="text-slate-400 leading-relaxed">
-              Shopify ki official screen aayegi — <strong>"Install app"</strong> click karo. Products & Orders access approve hoga.
-            </p>
+          {/* Step 2 */}
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 flex gap-3">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase h-fit shrink-0">Step 2</span>
+            <div>
+              <h4 className="font-bold text-slate-200 text-sm mb-1">Develop Apps Enable Karo</h4>
+              <p className="text-slate-400"><strong className="text-slate-200">Settings</strong> (gear icon, bottom-left) → <strong className="text-slate-200">Apps and sales channels</strong> → <strong className="text-slate-200">Develop apps</strong> → <strong className="text-cyan-400">"Allow custom app development"</strong> click karo</p>
+            </div>
           </div>
 
-          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
-            <span className="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Done!</span>
-            <h4 className="font-bold text-emerald-300 text-sm">Auto-Connected ✅</h4>
-            <p className="text-slate-400 leading-relaxed">
-              Automatically wapas dashboard pe aa jaoge — store connected, products sync ready! 🚀
-            </p>
+          {/* Step 3 */}
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 flex gap-3">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase h-fit shrink-0">Step 3</span>
+            <div>
+              <h4 className="font-bold text-slate-200 text-sm mb-1">Custom App Create Karo</h4>
+              <p className="text-slate-400"><strong className="text-cyan-400">"Create an app"</strong> click karo → App name: <code className="text-cyan-400 bg-slate-700 px-1.5 py-0.5 rounded">360 Dropship</code> → <strong className="text-slate-200">Create app</strong></p>
+            </div>
           </div>
+
+          {/* Step 4 */}
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 flex gap-3">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase h-fit shrink-0">Step 4</span>
+            <div>
+              <h4 className="font-bold text-slate-200 text-sm mb-1">API Permissions Set Karo</h4>
+              <p className="text-slate-400"><strong className="text-cyan-400">"Configure Admin API scopes"</strong> click karo → Enable: <code className="text-cyan-400 bg-slate-700 px-1.5 py-0.5 rounded">read_products, write_products, read_orders, write_orders</code> → <strong className="text-slate-200">Save</strong></p>
+            </div>
+          </div>
+
+          {/* Step 5 */}
+          <div className="p-4 bg-emerald-900/40 rounded-2xl border border-emerald-700/50 flex gap-3">
+            <span className="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase h-fit shrink-0">Step 5</span>
+            <div>
+              <h4 className="font-bold text-emerald-300 text-sm mb-1">Install App & Token Copy Karo ✅</h4>
+              <p className="text-slate-400"><strong className="text-emerald-400">"Install app"</strong> click karo → <strong className="text-emerald-400">"Reveal token once"</strong> click karo → <code className="text-emerald-400 bg-slate-700 px-1.5 py-0.5 rounded">shpat_...</code> token copy karo → Upar form me paste karo!</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-[11px] font-bold flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>⚠️ Token sirf <strong>ek baar</strong> dikhta hai — turant copy karo! Lost ho jaye toh: Uninstall → Install karke naya generate karo. Ye method 100% FREE hai, koi charge nahi!</span>
         </div>
       </div>
 
