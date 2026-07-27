@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AlertCircle, MessageSquare } from 'lucide-react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import ProfitCalculator from './components/ProfitCalculator';
@@ -56,6 +57,70 @@ export default function App() {
   });
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [pendingApprovalModalOpen, setPendingApprovalModalOpen] = useState(false);
+
+  const sellerStatus = user ? (dbService.getSellerStatus(user.email) || 'INACTIVE') : 'ACTIVE';
+  const adminSettings = (dbService.getAdminSettings && dbService.getAdminSettings()) || { whatsappNumber: '+919876543210' };
+
+  // 30-SECOND PERIODIC TIMER FOR INACTIVE DROPSHIPPERS
+  useEffect(() => {
+    if (viewMode === 'dashboard' && sellerStatus === 'INACTIVE') {
+      // Trigger initial popup
+      setPendingApprovalModalOpen(true);
+
+      const interval = setInterval(() => {
+        setPendingApprovalModalOpen(true);
+      }, 30000); // 30 Seconds
+
+      return () => clearInterval(interval);
+    } else {
+      setPendingApprovalModalOpen(false);
+    }
+  }, [viewMode, sellerStatus, user]);
+  useEffect(() => {
+    const handleOAuthCallback = () => {
+      const hash = window.location.hash || window.location.search;
+      if (hash.includes('access_token')) {
+        try {
+          const tokenMatch = hash.match(/access_token=([^&]+)/);
+          if (tokenMatch && tokenMatch[1]) {
+            const jwtToken = tokenMatch[1];
+            const payloadBase64 = jwtToken.split('.')[1];
+            const decodedJson = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+            const oAuthEmail = decodedJson.email;
+            const oAuthName = decodedJson.user_metadata?.full_name || decodedJson.user_metadata?.name || (oAuthEmail ? oAuthEmail.split('@')[0] : 'Google User');
+
+            if (oAuthEmail) {
+              const isMasterAdmin = (oAuthEmail.toLowerCase() === 'rustic241@gmail.com');
+              const oAuthUser = dbService.signUp({
+                name: oAuthName,
+                email: oAuthEmail,
+                phone: '+91 9876543210',
+                password: 'GoogleOAuthUser2026!'
+              }).user;
+
+              setUser(oAuthUser);
+              if (isMasterAdmin) {
+                setViewMode('admin');
+                setUserRole('admin');
+                setActiveTab('payout-approvals');
+                window.location.hash = '#/admin';
+              } else {
+                setViewMode('dashboard');
+                setUserRole('dropshipper');
+                setActiveTab('dashboard');
+                window.location.hash = '#/dashboard';
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse Google OAuth token:', e);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, []);
 
   // STRICT ROUTE SECURITY GUARD & SESSION PERSISTENCE
   useEffect(() => {
@@ -299,7 +364,10 @@ export default function App() {
       case 'dashboard':
         return (
           <DashboardHome
+            user={user}
+            orders={orders}
             onSelectTab={setActiveTab}
+            onSelectProduct={handleSelectProduct}
             onOpenRechargeModal={() => setRechargeModalOpen(true)}
             products={products}
             walletBalance={walletBalance}
@@ -354,7 +422,7 @@ export default function App() {
       case 'payouts':
         return <PayoutsView user={user} />;
       case 'shopify-manager':
-        return <ShopifyStoreManagerView onSelectTab={setActiveTab} />;
+        return <ShopifyStoreManagerView user={user} onSelectTab={setActiveTab} />;
       case 'onboarding':
         return <OnboardingWizard onComplete={() => setActiveTab('dashboard')} />;
       case 'tickets':
@@ -509,6 +577,60 @@ export default function App() {
       )}
 
       {/* MODALS */}
+      {/* 30-SECOND PENDING APPROVAL POPUP MODAL FOR INACTIVE DROPSHIPPERS */}
+      {viewMode === 'dashboard' && sellerStatus === 'INACTIVE' && pendingApprovalModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-amber-200 text-slate-900 text-center relative overflow-hidden">
+            
+            <div className="w-16 h-16 rounded-3xl bg-amber-100 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
+              <AlertCircle className="w-9 h-9 animate-bounce text-amber-600" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-amber-200">
+                ⏳ ACCOUNT STATUS: PENDING APPROVAL
+              </span>
+              <h3 className="text-2xl font-black text-slate-900 font-heading tracking-tight">
+                Dropshipper Account Pending Activation
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-md mx-auto leading-relaxed">
+                Your account is currently <strong>Pending Admin Approval</strong>. To unlock full wholesale catalog access (10,000+ products) and connect your Shopify store, please contact our 360 Agency Admin on WhatsApp for instant verification!
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1 text-left font-medium text-slate-700">
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                🔒 Inactive Account Restrictions:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-600">
+                <li>Wholesale Catalog capped at <strong>first 50 products</strong>.</li>
+                <li>Shopify Store Push & Auto-Sync disabled until activated by Admin.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <a
+                href={`https://wa.me/${(adminSettings.whatsappNumber || '+919876543210').replace(/\D/g, '')}?text=Hello%20Admin,%20please%20activate%20my%20360%20Dropship%20account%20(${encodeURIComponent(user?.email || '')})`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 px-6 rounded-2xl flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-600/30 text-sm transition-all"
+              >
+                <MessageSquare className="w-5 h-5 text-white" />
+                <span>Contact Admin on WhatsApp ({adminSettings.whatsappNumber || '+91 9876543210'}) →</span>
+              </a>
+
+              <button
+                onClick={() => setPendingApprovalModalOpen(false)}
+                className="text-xs text-slate-400 hover:text-slate-600 font-bold underline py-1"
+              >
+                Remind Me Later (Re-opens in 30 Seconds)
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       <AuthModal
         isOpen={authModalOpen}
         initialMode={authMode}
