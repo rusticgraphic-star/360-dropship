@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, MessageSquare, X } from 'lucide-react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import ProfitCalculator from './components/ProfitCalculator';
@@ -584,7 +584,16 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-amber-200 text-slate-900 text-center relative overflow-hidden">
             
-            <div className="w-16 h-16 rounded-3xl bg-amber-100 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
+            {/* Top Right Close / Cancel 'X' Button */}
+            <button
+              onClick={() => setPendingApprovalModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-16 h-16 rounded-3xl bg-amber-100 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-inner mt-2">
               <AlertCircle className="w-9 h-9 animate-bounce text-amber-600" />
             </div>
 
@@ -600,17 +609,7 @@ export default function App() {
               </p>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1 text-left font-medium text-slate-700">
-              <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                🔒 Inactive Account Restrictions:
-              </p>
-              <ul className="list-disc pl-4 space-y-1 text-slate-600">
-                <li>Wholesale Catalog capped at <strong>first 50 products</strong>.</li>
-                <li>Shopify Store Push & Auto-Sync disabled until activated by Admin.</li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2">
               <a
                 href={`https://wa.me/${(adminSettings.whatsappNumber || '+919876543210').replace(/\D/g, '')}?text=Hello%20Admin,%20please%20activate%20my%20360%20Dropship%20account%20(${encodeURIComponent(user?.email || '')})`}
                 target="_blank"
@@ -625,7 +624,7 @@ export default function App() {
                 onClick={() => setPendingApprovalModalOpen(false)}
                 className="text-xs text-slate-400 hover:text-slate-600 font-bold underline py-1"
               >
-                Remind Me Later (Re-opens in 30 Seconds)
+                Remind Me Later
               </button>
             </div>
 
