@@ -28,7 +28,10 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
   const handleConnectStore = (e) => {
     e.preventDefault();
     let cleanedDomain = storeDomain.trim().toLowerCase().replace(/^https?:\/\//, '');
-    if (!cleanedDomain) return;
+    if (!cleanedDomain) {
+      alert('Please enter your Shopify Store URL (e.g. mystore.myshopify.com)');
+      return;
+    }
 
     if (!cleanedDomain.includes('.myshopify.com') && !cleanedDomain.includes('.')) {
       cleanedDomain = `${cleanedDomain}.myshopify.com`;
@@ -36,12 +39,14 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
     setIsConnecting(true);
 
+    const activeToken = accessToken.trim() || `shpat_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 10)}`;
+
     // Save connection locally in dbService
     if (user?.id) {
       dbService.saveUserShopify(user.id, {
         isConnected: true,
         domain: cleanedDomain,
-        token: accessToken || `shpat_${Math.random().toString(36).substring(2, 15)}`,
+        token: activeToken,
         connectedAt: new Date().toISOString()
       });
     }
@@ -50,14 +55,11 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
       setIsConnecting(false);
       setIsConnected(true);
       setStoreDomain(cleanedDomain);
+      setAccessToken(activeToken);
       setSaveSuccess(true);
 
-      // OPEN SHOPIFY ADMIN APPS DASHBOARD DIRECTLY WITHOUT OAUTH CLIENT_ID ERROR
-      const shopifyAdminUrl = `https://${cleanedDomain}/admin/apps`;
-      window.open(shopifyAdminUrl, '_blank');
-
-      setTimeout(() => setSaveSuccess(false), 3500);
-    }, 800);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    }, 600);
   };
 
   const handleDisconnect = () => {
