@@ -1,5 +1,9 @@
 {
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "env": {
+    "SHOPIFY_API_KEY": "59b669059770244c0513bec02b008c6b"
+  }
 }
