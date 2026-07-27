@@ -40,7 +40,7 @@ export const dbService = {
 
   // User Sign Up (Email & Password or OAuth)
   signUp({ name, email, phone, password }) {
-    this.init();
+    dbService.init();
     const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
@@ -74,7 +74,7 @@ export const dbService = {
 
     // Also sync to sellers list for Admin Management
     try {
-      const sellers = this.getSellers();
+      const sellers = dbService.getSellers();
       if (Array.isArray(sellers) && !sellers.some(s => s && s.email && s.email.toLowerCase() === newUser.email.toLowerCase())) {
         sellers.push({
           id: userId,
@@ -84,7 +84,7 @@ export const dbService = {
           status: newUser.status,
           createdAt: new Date().toISOString().split('T')[0]
         });
-        this.saveSellers(sellers);
+        dbService.saveSellers(sellers);
       }
     } catch (e) {}
 
@@ -100,7 +100,7 @@ export const dbService = {
 
   // User Sign In (Email / Password)
   signIn({ email, password }) {
-    this.init();
+    dbService.init();
     const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
@@ -108,7 +108,7 @@ export const dbService = {
     const user = users.find(u => (email && u && u.email && typeof u.email === 'string' && u.email.toLowerCase() === email.toLowerCase()));
 
     if (!user) {
-      return this.signUp({ name: email.split('@')[0], email, password });
+      return dbService.signUp({ name: email.split('@')[0], email, password });
     }
 
     if (user.email.toLowerCase() === 'rustic241@gmail.com') {
@@ -218,10 +218,10 @@ export const dbService = {
 
   pushProductToUserStore(userId, productId) {
     if (!userId || !productId) return [];
-    const existing = this.getUserPushedProducts(userId);
+    const existing = dbService.getUserPushedProducts(userId);
     if (!existing.includes(productId)) {
       const updated = [...existing, productId];
-      this.saveUserPushedProducts(userId, updated);
+      dbService.saveUserPushedProducts(userId, updated);
       return updated;
     }
     return existing;
@@ -240,7 +240,7 @@ export const dbService = {
 
   // Seller Accounts List & Real User Status Isolation
   getSellers() {
-    this.init();
+    dbService.init();
     const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
@@ -272,7 +272,7 @@ export const dbService = {
     let statusMap = {};
     try { statusMap = JSON.parse(statusMapStr); } catch (e) { statusMap = {}; }
 
-    const sellers = this.getSellers();
+    const sellers = dbService.getSellers();
     const target = sellers.find(s => s.id === sellerId || s.email === sellerId);
     if (target) {
       const newStatus = target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -280,13 +280,13 @@ export const dbService = {
       statusMap[target.email] = newStatus;
       safeStorage.setItem('360_sellers_status_map', JSON.stringify(statusMap));
     }
-    return this.getSellers();
+    return dbService.getSellers();
   },
 
   getSellerStatus(email) {
     if (!email || typeof email !== 'string') return 'INACTIVE';
     if (email.toLowerCase() === 'rustic241@gmail.com') return 'ACTIVE';
-    const sellers = this.getSellers();
+    const sellers = dbService.getSellers();
     if (!Array.isArray(sellers)) return 'INACTIVE';
     const found = sellers.find(s => s && s.email && typeof s.email === 'string' && s.email.toLowerCase() === email.toLowerCase());
     return found ? (found.status || 'INACTIVE') : 'INACTIVE';
@@ -323,7 +323,7 @@ export const dbService = {
   },
 
   saveProducts(products) {
-    const clean = this.deduplicate(products);
+    const clean = dbService.deduplicate(products);
     safeStorage.setItem('360_wholesale_products', JSON.stringify(clean));
   },
 
@@ -332,3 +332,5 @@ export const dbService = {
     safeStorage.removeItem(DB_SESSION_KEY);
   }
 };
+
+export default dbService;
