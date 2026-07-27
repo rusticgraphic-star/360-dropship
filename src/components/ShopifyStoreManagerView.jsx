@@ -39,6 +39,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
     setIsConnecting(true);
 
+    const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY || '59b669059770244c0513bec02b008c6b';
     const activeToken = accessToken.trim() || `shpat_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 10)}`;
 
     // Save connection locally in dbService
@@ -57,6 +58,13 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
       setStoreDomain(cleanedDomain);
       setAccessToken(activeToken);
       setSaveSuccess(true);
+
+      // OPEN OFFICIAL SHOPIFY PARTNER OAUTH AUTHORIZATION SCREEN IN NEW TAB IF USING DIRECT OAUTH
+      if (connectMethod === 'direct') {
+        const redirectUri = window.location.origin + '/#/dashboard';
+        const shopifyOAuthUrl = `https://${cleanedDomain}/admin/oauth/authorize?client_id=${apiKey}&scope=read_products,write_products,read_orders,write_orders,read_inventory,write_inventory&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        window.open(shopifyOAuthUrl, '_blank');
+      }
 
       setTimeout(() => setSaveSuccess(false), 4000);
     }, 600);
