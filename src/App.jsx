@@ -85,38 +85,30 @@ export default function App() {
   }, [user]);
 
   const handleClosePendingModal = () => {
-    try { sessionStorage.setItem('360_dismissed_pending_modal', 'true'); } catch (e) {}
+    try {
+      const emailKey = user?.email ? user.email.toLowerCase().trim() : 'user';
+      localStorage.setItem('360_dismissed_pending_modal_' + emailKey, 'true');
+      sessionStorage.setItem('360_dismissed_pending_modal', 'true');
+    } catch (e) {}
     setPendingApprovalModalOpen(false);
   };
 
-  // 30-SECOND PERIODIC TIMER FOR INACTIVE DROPSHIPPERS
+  // PERIODIC CHECK FOR INACTIVE DROPSHIPPERS (ONLY IF NOT DISMISSED)
   useEffect(() => {
-    let interval;
     if (viewMode === 'dashboard') {
+      const emailKey = user?.email ? user.email.toLowerCase().trim() : 'user';
+      const isDismissedLocal = localStorage.getItem('360_dismissed_pending_modal_' + emailKey) === 'true';
+      const isDismissedSession = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
       const currentStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
-      const isDismissed = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
 
-      if (currentStatus === 'INACTIVE' && !isDismissed) {
+      if (currentStatus === 'INACTIVE' && !isDismissedLocal && !isDismissedSession) {
         setPendingApprovalModalOpen(true);
-        interval = setInterval(() => {
-          const freshStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
-          const freshDismissed = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
-          if (freshStatus === 'INACTIVE' && !freshDismissed) {
-            setPendingApprovalModalOpen(true);
-          } else {
-            setPendingApprovalModalOpen(false);
-          }
-        }, 30000); // 30 Seconds
       } else {
         setPendingApprovalModalOpen(false);
       }
     } else {
       setPendingApprovalModalOpen(false);
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
   }, [viewMode, sellerStatus, user]);
   // Handle Google OAuth Callback (#access_token=...)
   useEffect(() => {
