@@ -114,7 +114,7 @@ export default async function handler(req, res) {
       console.error('Token exchange failed:', tokenResponse);
       return res.redirect(
         302,
-        `https://360dropship.in/#/dashboard?shopify_error=${encodeURIComponent('Token exchange failed: ' + JSON.stringify(tokenResponse.data))}`
+        `https://www.360dropship.in/#/dashboard?shopify_error=${encodeURIComponent('Token exchange failed: ' + JSON.stringify(tokenResponse.data))}`
       );
     }
 
@@ -130,13 +130,13 @@ export default async function handler(req, res) {
     // Pass token via URL fragment (hash) so it's not logged in server access logs
     res.redirect(
       302,
-      `https://360dropship.in/#/dashboard?shopify_success=true&shopify_shop=${encodeURIComponent(shop)}&shopify_token=${encodeURIComponent(accessToken)}`
+      `https://www.360dropship.in/#/dashboard?shopify_success=true&shopify_shop=${encodeURIComponent(shop)}&shopify_token=${encodeURIComponent(accessToken)}`
     );
   } catch (err) {
     console.error('Shopify OAuth callback error:', err);
     res.redirect(
       302,
-      `https://360dropship.in/#/dashboard?shopify_error=${encodeURIComponent(err.message)}`
+      `https://www.360dropship.in/#/dashboard?shopify_error=${encodeURIComponent(err.message)}`
     );
   }
 }
