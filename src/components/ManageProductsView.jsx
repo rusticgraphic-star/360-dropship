@@ -12,6 +12,9 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const categoryStripRef = React.useRef(null);
 
+  // Derive categories list dynamically from products
+  const categories = ['ALL', ...Array.from(new Set((products || []).map(p => p.category).filter(Boolean)))];
+
   const scrollCategoryStrip = (direction) => {
     if (categoryStripRef.current) {
       const scrollAmount = direction === 'left' ? -220 : 220;
