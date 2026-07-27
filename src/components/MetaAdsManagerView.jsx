@@ -11,6 +11,9 @@ export default function MetaAdsManagerView({ campaigns, walletBalance, onOpenRec
   const totalConversions = campaigns.reduce((acc, c) => acc + c.conversions, 0);
   const isBalanceZero = walletBalance <= 0;
 
+  const activeCampaignsCount = campaigns.filter(c => c.status === 'ACTIVE').length;
+  const avgRoas = totalConversions > 0 ? '3.95x' : '0.00x';
+
   return (
     <div className="space-y-8 animate-fade-in text-slate-900 max-w-7xl mx-auto">
       
@@ -81,14 +84,16 @@ export default function MetaAdsManagerView({ campaigns, walletBalance, onOpenRec
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Ad Spend</span>
-          <p className="text-2xl font-black text-slate-900 font-heading">₹{totalSpent.toLocaleString('en-IN')}</p>
-          <p className="text-[11px] text-slate-500 font-medium mt-1">Across 2 Active Meta Campaigns</p>
+          <p className="text-2xl font-black text-slate-900 font-heading">₹{(totalSpent || 0).toLocaleString('en-IN')}</p>
+          <p className="text-[11px] text-slate-500 font-medium mt-1">
+            Across {activeCampaignsCount} Active Meta {activeCampaignsCount === 1 ? 'Campaign' : 'Campaigns'}
+          </p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Generated Purchases</span>
           <p className="text-2xl font-black text-cyan-600 font-heading">{totalConversions} Conversions</p>
-          <p className="text-[11px] text-cyan-600 font-bold mt-1">Average ROAS: 3.95x</p>
+          <p className="text-[11px] text-cyan-600 font-bold mt-1">Average ROAS: {avgRoas}</p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
