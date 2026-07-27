@@ -31,9 +31,23 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
   const [customMarkupPrice, setCustomMarkupPrice] = useState(999);
   const [pushedSuccess, setPushedSuccess] = useState(false);
 
-  const categories = ['ALL', ...new Set((products || []).map(p => p.category).filter(Boolean))];
+  const [sellerStatus, setSellerStatus] = useState(() => dbService.getSellerStatus(user?.email));
 
-  const sellerStatus = dbService.getSellerStatus(user?.email);
+  React.useEffect(() => {
+    const handleStatusChange = () => {
+      if (user?.email) {
+        setSellerStatus(dbService.getSellerStatus(user.email));
+      }
+    };
+    handleStatusChange();
+    window.addEventListener('sellerStatusChanged', handleStatusChange);
+    window.addEventListener('storage', handleStatusChange);
+    return () => {
+      window.removeEventListener('sellerStatusChanged', handleStatusChange);
+      window.removeEventListener('storage', handleStatusChange);
+    };
+  }, [user]);
+
   const isInactive = sellerStatus === 'INACTIVE';
 
   // Show products catalog: Filter for pushed products if viewModeFilter === 'my'
