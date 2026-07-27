@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { 
   Package, Search, Filter, Plus, FileSpreadsheet, Play, CheckCircle2, 
   ShoppingBag, ArrowRight, Video, Tag, DollarSign, PackageCheck, Eye, X, 
-  Truck, ShieldCheck, Info, Copy, ChevronLeft, ChevronRight, Calculator, RefreshCw, Scale, RefreshCcw
+  Truck, ShieldCheck, Info, Copy, ChevronLeft, ChevronRight, Calculator, RefreshCw, Scale, RefreshCcw, AlertCircle
 } from 'lucide-react';
 import ProfitCalculatorModal from './ProfitCalculatorModal';
+import { dbService } from '../services/dbService';
 
 export default function ManageProductsView({ user, products, userPushedIds = [], onPushProduct, onOpenBulkUpload, onSelectTab, onSelectProduct, viewModeFilter = 'all' }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,10 +33,18 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
 
   const categories = ['ALL', ...new Set((products || []).map(p => p.category).filter(Boolean))];
 
+  const sellerStatus = dbService.getSellerStatus(user?.email);
+  const isInactive = sellerStatus === 'INACTIVE';
+
   // Show products catalog: Filter for pushed products if viewModeFilter === 'my'
-  const baseProductsList = viewModeFilter === 'my'
+  // If seller is INACTIVE, limit wholesale catalog to first 50 products only!
+  const baseList = viewModeFilter === 'my'
     ? (products || []).filter(p => (userPushedIds || []).includes(p.id))
     : (products || []);
+
+  const baseProductsList = (isInactive && viewModeFilter === 'all')
+    ? baseList.slice(0, 50)
+    : baseList;
 
   const filteredProducts = baseProductsList.filter(p => {
     const nameMatch = p.name ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) : false;
@@ -101,6 +110,33 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
           </button>
         </div>
       </div>
+
+      {/* INACTIVE SELLER 50 PRODUCTS RESTRICTION ALERT BANNER */}
+      {isInactive && viewModeFilter === 'all' && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 text-xs font-medium shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-xl text-amber-600 shrink-0 border border-amber-200">
+              <AlertCircle className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <p className="font-extrabold text-amber-950 text-xs">
+                ⏳ Account Status: Pending Admin Verification
+              </p>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                Your wholesale catalog is restricted to the <strong>first 50 products</strong>. Contact Admin on WhatsApp to activate your account and unlock 10,000+ catalog!
+              </p>
+            </div>
+          </div>
+          <a
+            href={`https://wa.me/${(dbService.getAdminSettings().whatsappNumber || '+919876543210').replace(/\D/g, '')}?text=Hello%20Admin,%20please%20activate%20my%20360%20Dropship%20account%20(${encodeURIComponent(user?.email || '')})`}
+            target="_blank"
+            rel="noreferrer"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] px-4 py-2 rounded-xl shadow-xs shrink-0 inline-flex items-center gap-1.5"
+          >
+            Activate via WhatsApp →
+          </a>
+        </div>
+      )}
 
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-4">
