@@ -84,16 +84,24 @@ export default function App() {
     };
   }, [user]);
 
+  const handleClosePendingModal = () => {
+    try { sessionStorage.setItem('360_dismissed_pending_modal', 'true'); } catch (e) {}
+    setPendingApprovalModalOpen(false);
+  };
+
   // 30-SECOND PERIODIC TIMER FOR INACTIVE DROPSHIPPERS
   useEffect(() => {
     let interval;
     if (viewMode === 'dashboard') {
       const currentStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
-      if (currentStatus === 'INACTIVE') {
+      const isDismissed = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
+
+      if (currentStatus === 'INACTIVE' && !isDismissed) {
         setPendingApprovalModalOpen(true);
         interval = setInterval(() => {
           const freshStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
-          if (freshStatus === 'INACTIVE') {
+          const freshDismissed = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
+          if (freshStatus === 'INACTIVE' && !freshDismissed) {
             setPendingApprovalModalOpen(true);
           } else {
             setPendingApprovalModalOpen(false);
@@ -619,7 +627,7 @@ export default function App() {
             
             {/* Top Right Close / Cancel 'X' Button */}
             <button
-              onClick={() => setPendingApprovalModalOpen(false)}
+              onClick={handleClosePendingModal}
               className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               title="Close modal"
             >
@@ -654,7 +662,7 @@ export default function App() {
               </a>
 
               <button
-                onClick={() => setPendingApprovalModalOpen(false)}
+                onClick={handleClosePendingModal}
                 className="text-xs text-slate-400 hover:text-slate-600 font-bold underline py-1"
               >
                 Remind Me Later
