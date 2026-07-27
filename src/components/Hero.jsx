@@ -178,9 +178,9 @@ export default function Hero({ onOpenAuth }) {
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-left">
-            <div className="text-blue-600 font-extrabold text-xl mb-1 font-heading">Meta Agency</div>
+            <div className="text-blue-600 font-extrabold text-xl mb-1 font-heading">Ad Agency</div>
             <p className="text-xs font-bold text-slate-900">Ads Engine</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Auto-pause safeguard at ₹0</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Meta Ads Agency</p>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-left">
