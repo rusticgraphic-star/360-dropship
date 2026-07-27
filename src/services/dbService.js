@@ -258,7 +258,7 @@ export const dbService = {
       name: u.name || (u.email ? u.email.split('@')[0] : 'Registered Dropshipper'),
       email: u.email,
       phone: u.phone || '+91 9876543210',
-      status: statusMap[u.id] || statusMap[u.email] || u.status || 'INACTIVE',
+      status: statusMap[u.id] || statusMap[u.email] || (u.email ? statusMap[u.email.toLowerCase().trim()] : null) || u.status || 'ACTIVE',
       createdAt: u.createdAt ? u.createdAt.split('T')[0] : '2026-07-27'
     }));
   },
