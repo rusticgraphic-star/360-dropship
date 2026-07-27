@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingBag, ArrowRight, ShieldCheck, Zap, LogIn, Menu, X } from 'lucide-react';
 
-export default function Navbar({ onOpenAuth, onGoToDashboard, isLoggedIn }) {
+export default function Navbar({ onOpenAuth, onGoToDashboard, onGoToAdmin, isLoggedIn }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -67,80 +67,14 @@ export default function Navbar({ onOpenAuth, onGoToDashboard, isLoggedIn }) {
           {/* Mobile Menu Toggle Button */}
           <div className="flex md:hidden items-center gap-2">
             <button
-              onClick={() => onOpenAuth('signup')}
-              className="btn-primary text-xs py-2 px-3 rounded-xl shadow-xs"
-            >
-              Start Free
-            </button>
-
-            <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
-              className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100"
+              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             >
-              {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileNavOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
 
         </div>
-
-        {/* Mobile Dropdown Nav Menu */}
-        {mobileNavOpen && (
-          <div className="md:hidden py-4 border-t border-slate-200 space-y-3 animate-fade-in text-sm font-bold">
-            <a 
-              href="#features" 
-              onClick={() => setMobileNavOpen(false)}
-              className="block px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50"
-            >
-              Why 360
-            </a>
-            <a 
-              href="#shopify-sync" 
-              onClick={() => setMobileNavOpen(false)}
-              className="block px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50"
-            >
-              Shopify Sync
-            </a>
-            <a 
-              href="#calculator" 
-              onClick={() => setMobileNavOpen(false)}
-              className="block px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50"
-            >
-              Margin Calculator
-            </a>
-            <a 
-              href="#comparison" 
-              onClick={() => setMobileNavOpen(false)}
-              className="block px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50"
-            >
-              Comparison
-            </a>
-            <a 
-              href="#faqs" 
-              onClick={() => setMobileNavOpen(false)}
-              className="block px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50"
-            >
-              FAQs
-            </a>
-
-            <div className="pt-2 flex flex-col gap-2">
-              <button
-                onClick={() => { onOpenAuth('login'); setMobileNavOpen(false); }}
-                className="btn-secondary w-full justify-center py-2.5 text-xs font-bold"
-              >
-                Sign In
-              </button>
-              {isLoggedIn && (
-                <button
-                  onClick={() => { onGoToDashboard(); setMobileNavOpen(false); }}
-                  className="btn-primary w-full justify-center py-2.5 text-xs font-bold"
-                >
-                  Open Dashboard →
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
       </div>
     </nav>
   );
