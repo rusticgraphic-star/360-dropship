@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Store, CheckCircle2, RefreshCw, Zap, ExternalLink, Key, Link2, ShieldCheck, Copy, ArrowRight, AlertCircle, Unlink } from 'lucide-react';
+import { dbService } from '../services/dbService';
 
-export default function ShopifyStoreManagerView({ onSelectTab }) {
+export default function ShopifyStoreManagerView({ user, onSelectTab }) {
   const [connectMethod, setConnectMethod] = useState('direct'); // 'direct' or 'manual'
   const [storeDomain, setStoreDomain] = useState('');
   const [accessToken, setAccessToken] = useState('');
@@ -9,22 +10,59 @@ export default function ShopifyStoreManagerView({ onSelectTab }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Load existing user Shopify connection
+  useEffect(() => {
+    if (user?.id) {
+      const shopifyData = dbService.getUserShopify(user.id);
+      if (shopifyData && shopifyData.isConnected) {
+        setIsConnected(true);
+        setStoreDomain(shopifyData.domain || '');
+        setAccessToken(shopifyData.token || '');
+      }
+    }
+  }, [user]);
+
+  const userPushedProducts = user?.id ? dbService.getUserPushedProducts(user.id) : [];
+
   const handleConnectStore = (e) => {
     e.preventDefault();
-    if (!storeDomain) return;
+    let cleanedDomain = storeDomain.trim();
+    if (!cleanedDomain) return;
+
+    if (!cleanedDomain.includes('.myshopify.com') && !cleanedDomain.includes('.')) {
+      cleanedDomain = `${cleanedDomain}.myshopify.com`;
+    }
+
     setIsConnecting(true);
     setTimeout(() => {
       setIsConnecting(false);
       setIsConnected(true);
+      setStoreDomain(cleanedDomain);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+
+      // Save connection locally in dbService
+      if (user?.id) {
+        dbService.saveUserShopify(user.id, {
+          isConnected: true,
+          domain: cleanedDomain,
+          token: accessToken || 'shpat_360dropship_auto_token_2026',
+          connectedAt: new Date().toISOString()
+        });
+      }
+
+      setTimeout(() => setSaveSuccess(false), 3500);
     }, 1200);
   };
 
   const handleDisconnect = () => {
-    setIsConnected(false);
-    setStoreDomain('');
-    setAccessToken('');
+    if (window.confirm('Are you sure you want to disconnect your Shopify store?')) {
+      setIsConnected(false);
+      setStoreDomain('');
+      setAccessToken('');
+      if (user?.id) {
+        dbService.saveUserShopify(user.id, { isConnected: false, domain: '', token: '' });
+      }
+    }
   };
 
   return (
@@ -32,12 +70,12 @@ export default function ShopifyStoreManagerView({ onSelectTab }) {
       
       {/* Header */}
       <div className="border-b border-slate-200 pb-5">
-        <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Automated E-Commerce Sync</span>
+        <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Automated E-Commerce Sync Engine</span>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-heading tracking-tight mt-0.5">
           Shopify Store Manager
         </h1>
         <p className="text-xs sm:text-sm text-slate-600">
-          Connect your Shopify storefront via 1-Click Direct App OAuth or Manual Custom App Access Token.
+          Connect your Shopify storefront to enable 1-Click Wholesale Product Pushing & Automated Order Routing.
         </p>
       </div>
 
@@ -78,13 +116,22 @@ export default function ShopifyStoreManagerView({ onSelectTab }) {
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
               <span className="text-slate-500 block mb-1">Synced Catalog Items</span>
-              <span className="font-extrabold text-slate-900 text-sm font-heading">0 Products Pushed</span>
+              <span className="font-extrabold text-blue-600 text-sm font-heading">{userPushedProducts.length} Products Pushed</span>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
               <span className="text-slate-500 block mb-1">Order Dispatch Sync</span>
-              <span className="font-extrabold text-cyan-600 text-sm font-heading">Instant (&lt; 1s)</span>
+              <span className="font-extrabold text-emerald-600 text-sm font-heading">Instant (&lt; 1s)</span>
             </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => onSelectTab('all-products')}
+              className="btn-primary text-xs py-2.5 px-5 rounded-xl shadow-md flex items-center gap-2"
+            >
+              Browse Catalog & Push Products →
+            </button>
           </div>
         </div>
       ) : (
@@ -140,7 +187,7 @@ export default function ShopifyStoreManagerView({ onSelectTab }) {
         </div>
 
         {saveSuccess && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs font-bold flex items-center gap-2">
+          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fade-in">
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
             <span>Shopify Store Connected Successfully! Live auto-order routing and catalog push activated.</span>
           </div>
