@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { CATEGORIES } from '../data/mockData';
 
-export default function DashboardHome({ user, orders = [], onSelectTab, onOpenRechargeModal, products, walletBalance }) {
+export default function DashboardHome({ user, orders = [], onSelectTab, onSelectProduct, onOpenRechargeModal, products, walletBalance }) {
   const categoryScrollRef = useRef(null);
 
   const scrollCategories = (direction) => {
@@ -171,7 +171,7 @@ export default function DashboardHome({ user, orders = [], onSelectTab, onOpenRe
               <Wallet className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-slate-900 font-heading">₹{walletBalance.toLocaleString('en-IN')}</p>
+          <p className="text-2xl font-black text-slate-900 font-heading">₹{(walletBalance || 0).toLocaleString('en-IN')}</p>
           <button
             onClick={onOpenRechargeModal}
             className="text-[11px] text-blue-600 hover:text-blue-700 font-bold mt-1 inline-block underline"
@@ -213,21 +213,25 @@ export default function DashboardHome({ user, orders = [], onSelectTab, onOpenRe
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-          {products.slice(0, 4).map((product) => {
-            const baseCost = product.wholesalePrice + product.shippingFee;
-            const estMargin = product.suggestedMrp - baseCost - (product.suggestedMrp * 0.05);
+          {products && products.length > 0 && products.slice(0, 4).map((product) => {
+            const wholesaleCost = parseFloat(product.wholesalePrice || 350);
+            const shipping = parseFloat(product.shippingFee || 75);
+            const mrp = parseFloat(product.suggestedMrp || 1299);
+            const baseCost = wholesaleCost + shipping;
+            const estMargin = Math.max(0, mrp - baseCost - (mrp * 0.05));
 
             return (
               <div
                 key={product.id}
-                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:border-blue-500 transition-all flex flex-col justify-between"
+                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:border-blue-500 transition-all flex flex-col justify-between group cursor-pointer"
+                onClick={() => onSelectProduct ? onSelectProduct(product) : onSelectTab('manage-products')}
               >
                 <div>
-                  <div className="relative h-44 bg-slate-100">
+                  <div className="relative h-44 bg-slate-100 overflow-hidden">
                     <img
                       src={product.image}
                       alt={product.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <span className="absolute top-2 left-2 bg-white/95 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 shadow-xs">
                       {product.category}
@@ -235,7 +239,7 @@ export default function DashboardHome({ user, orders = [], onSelectTab, onOpenRe
                   </div>
 
                   <div className="p-4">
-                    <h4 className="font-bold text-slate-900 text-sm line-clamp-2 mb-2 leading-snug">
+                    <h4 className="font-bold text-slate-900 text-sm line-clamp-2 mb-2 leading-snug group-hover:text-blue-600 transition-colors">
                       {product.name}
                     </h4>
 
