@@ -14,7 +14,7 @@ export default function handler(req, res) {
 
   const apiKey = process.env.SHOPIFY_API_KEY || '59b669059770244c0513bec02b008c6b';
   const scopes = 'read_products,write_products,read_orders,write_orders,read_inventory,write_inventory';
-  const redirectUri = `https://360dropship.in/api/shopify/callback`;
+  const redirectUri = `https://www.360dropship.in/api/shopify/callback`;
 
   // Generate a random nonce for CSRF protection
   const nonce = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
