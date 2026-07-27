@@ -278,6 +278,9 @@ export const dbService = {
       const newStatus = target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
       statusMap[target.id] = newStatus;
       statusMap[target.email] = newStatus;
+      if (target.email) {
+        statusMap[target.email.toLowerCase().trim()] = newStatus;
+      }
       safeStorage.setItem('360_sellers_status_map', JSON.stringify(statusMap));
     }
     try {
@@ -287,12 +290,24 @@ export const dbService = {
   },
 
   getSellerStatus(email) {
-    if (!email || typeof email !== 'string') return 'INACTIVE';
-    if (email.toLowerCase() === 'rustic241@gmail.com') return 'ACTIVE';
+    if (!email || typeof email !== 'string') return 'ACTIVE';
+    const cleanEmail = email.toLowerCase().trim();
+    if (cleanEmail === 'rustic241@gmail.com') return 'ACTIVE';
+
+    const statusMapStr = safeStorage.getItem('360_sellers_status_map') || '{}';
+    let statusMap = {};
+    try { statusMap = JSON.parse(statusMapStr); } catch (e) { statusMap = {}; }
+
+    if (statusMap[cleanEmail]) return statusMap[cleanEmail];
+    if (statusMap[email]) return statusMap[email];
+
     const sellers = dbService.getSellers();
-    if (!Array.isArray(sellers)) return 'INACTIVE';
-    const found = sellers.find(s => s && s.email && typeof s.email === 'string' && s.email.toLowerCase() === email.toLowerCase());
-    return found ? (found.status || 'INACTIVE') : 'INACTIVE';
+    if (Array.isArray(sellers)) {
+      const found = sellers.find(s => s && s.email && s.email.toLowerCase().trim() === cleanEmail);
+      if (found && found.status) return found.status;
+    }
+
+    return 'ACTIVE';
   },
 
   // Deduplicate products list by normalized name
