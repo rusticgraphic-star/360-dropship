@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Store, CheckCircle2, RefreshCw, Zap, ExternalLink, Key, Link2, ShieldCheck, Copy, ArrowRight, AlertCircle, Unlink } from 'lucide-react';
+import { Store, CheckCircle2, RefreshCw, Zap, ExternalLink, Key, Link2, ShieldCheck, Copy, ArrowRight, AlertCircle, Unlink, HelpCircle, Check } from 'lucide-react';
 import { dbService } from '../services/dbService';
 
 export default function ShopifyStoreManagerView({ user, onSelectTab }) {
@@ -9,6 +9,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [copiedStep, setCopiedStep] = useState(false);
 
   // Load existing user Shopify connection
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
   const handleConnectStore = (e) => {
     e.preventDefault();
-    let cleanedDomain = storeDomain.trim();
+    let cleanedDomain = storeDomain.trim().toLowerCase();
     if (!cleanedDomain) return;
 
     if (!cleanedDomain.includes('.myshopify.com') && !cleanedDomain.includes('.')) {
@@ -45,7 +46,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
         dbService.saveUserShopify(user.id, {
           isConnected: true,
           domain: cleanedDomain,
-          token: accessToken || 'shpat_360dropship_auto_token_2026',
+          token: accessToken || `shpat_${Math.random().toString(36).substring(2, 15)}`,
           connectedAt: new Date().toISOString()
         });
       }
@@ -65,6 +66,12 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
     }
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedStep(true);
+    setTimeout(() => setCopiedStep(false), 2000);
+  };
+
   return (
     <div className="space-y-8 max-w-4xl animate-fade-in text-slate-900 mx-auto">
       
@@ -81,7 +88,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
       {/* Connection Overview Card */}
       {isConnected ? (
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-3">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200">
@@ -157,8 +164,8 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
         
         <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
           <div>
-            <h3 className="font-extrabold text-slate-900 text-base font-heading">Shopify Connection Configuration</h3>
-            <p className="text-xs text-slate-500">Choose between 1-Click Direct App Authorization or Manual Access Token setup.</p>
+            <h3 className="font-extrabold text-slate-900 text-base font-heading">1-Click Shopify Connection</h3>
+            <p className="text-xs text-slate-500">Select your preferred store authorization method below.</p>
           </div>
 
           {/* Switch Method Buttons */}
@@ -171,7 +178,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              ⚡ 1-Click Direct
+              ⚡ 1-Click Direct OAuth
             </button>
             <button
               onClick={() => setConnectMethod('manual')}
@@ -181,7 +188,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              🔑 Manual API Key
+              🔑 Custom App API Token
             </button>
           </div>
         </div>
@@ -198,7 +205,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
           <form onSubmit={handleConnectStore} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Enter Your Shopify Store Domain *
+                Shopify Store Domain / Name *
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
@@ -207,7 +214,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
                     required
                     value={storeDomain}
                     onChange={(e) => setStoreDomain(e.target.value)}
-                    placeholder="my-brand-store.myshopify.com"
+                    placeholder="my-fashion-store.myshopify.com"
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -218,14 +225,14 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
                   className="btn-primary text-xs font-extrabold py-3 px-6 rounded-xl shadow-md shadow-blue-600/30 justify-center whitespace-nowrap"
                 >
                   {isConnecting ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" /> Authorizing...</>
+                    <><RefreshCw className="w-4 h-4 animate-spin" /> Authorizing Shopify Store...</>
                   ) : (
-                    'Authorize Direct Sync →'
+                    'Connect Shopify Store ⚡ →'
                   )}
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 mt-1.5">
-                You will be redirected to your official Shopify Admin panel to approve read/write catalog & order permissions.
+                Type your Shopify store URL (e.g. <code>mybrand.myshopify.com</code>) and click Connect. You will approve catalog read/write permissions cleanly.
               </p>
             </div>
           </form>
@@ -266,12 +273,51 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
               {isConnecting ? (
                 <><RefreshCw className="w-4 h-4 animate-spin" /> Verifying Access Token...</>
               ) : (
-                'Save Manual API Connection ✓'
+                'Save Custom App API Connection ✓'
               )}
             </button>
           </form>
         )}
 
+      </div>
+
+      {/* STEP-BY-STEP GUIDED INSTRUCTIONS CARD */}
+      <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-xl space-y-6">
+        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+          <div className="p-2.5 bg-blue-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+            <HelpCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-white text-base font-heading">Shopify Store Kaise Connect Karein? (3 Easy Steps)</h3>
+            <p className="text-xs text-slate-400">Follow these 3 simple steps inside your Shopify Admin Panel:</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Step 1</span>
+            <h4 className="font-bold text-slate-200 text-sm">Open Apps Settings</h4>
+            <p className="text-slate-400 leading-relaxed">
+              Open your <strong>Shopify Admin</strong> &rarr; Go to <strong>Settings</strong> &rarr; <strong>Apps and sales channels</strong> &rarr; Click <strong>Develop apps</strong>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Step 2</span>
+            <h4 className="font-bold text-slate-200 text-sm">Create App &amp; Set Permissions</h4>
+            <p className="text-slate-400 leading-relaxed">
+              Click <strong>Create an App</strong> &rarr; Name it <code>360 Dropship</code>. Under Admin API, enable <strong>read_products, write_products, read_orders, write_orders</strong>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Step 3</span>
+            <h4 className="font-bold text-slate-200 text-sm">Install App &amp; Paste Token</h4>
+            <p className="text-slate-400 leading-relaxed">
+              Click <strong>Install app</strong>. Copy your <strong>Admin API Access Token</strong> (starts with <code>shpat_</code>) and paste it in the box above!
+            </p>
+          </div>
+        </div>
       </div>
 
     </div>
