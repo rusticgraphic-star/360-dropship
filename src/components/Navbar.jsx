@@ -69,6 +69,7 @@ export default function Navbar({ onOpenAuth, onGoToDashboard, onGoToAdmin, isLog
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
               className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              aria-label="Toggle Mobile Navigation"
             >
               {mobileNavOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -76,6 +77,76 @@ export default function Navbar({ onOpenAuth, onGoToDashboard, onGoToAdmin, isLog
 
         </div>
       </div>
+
+      {/* Mobile Nav Drawer */}
+      {mobileNavOpen && (
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-4 animate-fade-in shadow-xl">
+          <div className="flex flex-col space-y-1.5 text-sm font-bold text-slate-800">
+            <a 
+              href="#features" 
+              onClick={() => setMobileNavOpen(false)} 
+              className="px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors block"
+            >
+              Why 360
+            </a>
+            <a 
+              href="#shopify-sync" 
+              onClick={() => setMobileNavOpen(false)} 
+              className="px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors block"
+            >
+              Shopify Sync
+            </a>
+            <a 
+              href="#calculator" 
+              onClick={() => setMobileNavOpen(false)} 
+              className="px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors block"
+            >
+              Margin Calculator
+            </a>
+            <a 
+              href="#comparison" 
+              onClick={() => setMobileNavOpen(false)} 
+              className="px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors block"
+            >
+              Comparison
+            </a>
+            <a 
+              href="#faqs" 
+              onClick={() => setMobileNavOpen(false)} 
+              className="px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors block"
+            >
+              FAQs
+            </a>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+            {isLoggedIn ? (
+              <button
+                onClick={() => { setMobileNavOpen(false); onGoToDashboard(); }}
+                className="btn-primary w-full py-3 text-xs font-extrabold shadow-md shadow-blue-600/30 flex items-center justify-center gap-2"
+              >
+                Go to Dashboard <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setMobileNavOpen(false); onOpenAuth('login'); }}
+                  className="w-full py-3 px-4 text-xs font-extrabold text-slate-700 hover:bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center gap-2"
+                >
+                  <LogIn className="w-4 h-4 text-slate-500" />
+                  Sign In
+                </button>
+                <button
+                  onClick={() => { setMobileNavOpen(false); onOpenAuth('signup'); }}
+                  className="btn-primary w-full py-3 text-xs font-extrabold shadow-md shadow-blue-600/30 flex items-center justify-center gap-2"
+                >
+                  Start Free <Zap className="w-4 h-4 text-white fill-white" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
