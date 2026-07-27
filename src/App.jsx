@@ -77,12 +77,14 @@ export default function App() {
       setPendingApprovalModalOpen(false);
     }
   }, [viewMode, sellerStatus, user]);
+  // Handle Google OAuth Callback (#access_token=...)
   useEffect(() => {
     const handleOAuthCallback = () => {
+      const fullUrl = window.location.href;
       const hash = window.location.hash || window.location.search;
-      if (hash.includes('access_token')) {
+      if (fullUrl.includes('access_token') || hash.includes('access_token')) {
         try {
-          const tokenMatch = hash.match(/access_token=([^&]+)/);
+          const tokenMatch = fullUrl.match(/access_token=([^&]+)/) || hash.match(/access_token=([^&]+)/);
           if (tokenMatch && tokenMatch[1]) {
             const jwtToken = tokenMatch[1];
             const payloadBase64 = jwtToken.split('.')[1];
