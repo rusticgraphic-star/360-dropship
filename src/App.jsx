@@ -423,6 +423,7 @@ export default function App() {
             product={selectedProduct}
             onBack={() => setActiveTab('all-products')}
             onSelectTab={setActiveTab}
+            onPushProduct={handlePushProductToStore}
           />
         );
       case 'all-products':
