@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Home, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Settings, 
   Store, HelpCircle, UserCheck, ShieldCheck, Zap, LogOut, ShieldAlert,
-  FileSpreadsheet, PlusCircle, Landmark, BarChart3, X, CheckSquare, PackageCheck
+  FileSpreadsheet, PlusCircle, Landmark, BarChart3, X, CheckSquare, PackageCheck, Users
 } from 'lucide-react';
 
 const DROPSHIPPER_MENU_ITEMS = [
@@ -18,6 +18,7 @@ const DROPSHIPPER_MENU_ITEMS = [
 ];
 
 const ADMIN_MENU_ITEMS = [
+  { id: 'dropshipper-management', label: 'All Dropshippers', icon: Users, badge: 'VERIFY' },
   { id: 'payout-approvals', label: 'Payout Release Desk', icon: Landmark, badge: 'PAYOUTS' },
   { id: 'admin-products', label: 'Add & Edit Products', icon: PlusCircle, badge: 'CATALOG' },
   { id: 'agency-settings', label: 'Agency UPI & Settings', icon: Settings, badge: 'UPI' },
