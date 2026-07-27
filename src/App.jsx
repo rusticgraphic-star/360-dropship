@@ -59,23 +59,56 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingApprovalModalOpen, setPendingApprovalModalOpen] = useState(false);
 
-  const sellerStatus = user ? (dbService.getSellerStatus(user.email) || 'INACTIVE') : 'ACTIVE';
+  const [sellerStatus, setSellerStatus] = useState(() => user ? dbService.getSellerStatus(user.email) : 'ACTIVE');
   const adminSettings = (dbService.getAdminSettings && dbService.getAdminSettings()) || { whatsappNumber: '+919876543210' };
+
+  // Sync seller status in real-time
+  useEffect(() => {
+    const refreshSellerStatus = () => {
+      if (user?.email) {
+        const fresh = dbService.getSellerStatus(user.email);
+        setSellerStatus(fresh || 'INACTIVE');
+        if (fresh === 'ACTIVE') {
+          setPendingApprovalModalOpen(false);
+        }
+      }
+    };
+
+    refreshSellerStatus();
+
+    window.addEventListener('sellerStatusChanged', refreshSellerStatus);
+    window.addEventListener('storage', refreshSellerStatus);
+    return () => {
+      window.removeEventListener('sellerStatusChanged', refreshSellerStatus);
+      window.removeEventListener('storage', refreshSellerStatus);
+    };
+  }, [user]);
 
   // 30-SECOND PERIODIC TIMER FOR INACTIVE DROPSHIPPERS
   useEffect(() => {
-    if (viewMode === 'dashboard' && sellerStatus === 'INACTIVE') {
-      // Trigger initial popup
-      setPendingApprovalModalOpen(true);
-
-      const interval = setInterval(() => {
+    let interval;
+    if (viewMode === 'dashboard') {
+      const currentStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
+      if (currentStatus === 'INACTIVE') {
         setPendingApprovalModalOpen(true);
-      }, 30000); // 30 Seconds
-
-      return () => clearInterval(interval);
+        interval = setInterval(() => {
+          const freshStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
+          if (freshStatus === 'INACTIVE') {
+            setPendingApprovalModalOpen(true);
+          } else {
+            setPendingApprovalModalOpen(false);
+          }
+        }, 30000); // 30 Seconds
+      } else {
+        setPendingApprovalModalOpen(false);
+      }
     } else {
       setPendingApprovalModalOpen(false);
     }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [viewMode, sellerStatus, user]);
   // Handle Google OAuth Callback (#access_token=...)
   useEffect(() => {
