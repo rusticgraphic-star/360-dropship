@@ -6,9 +6,17 @@ import {
 } from 'lucide-react';
 import ProfitCalculatorModal from './ProfitCalculatorModal';
 
-export default function ManageProductsView({ products, onOpenBulkUpload, onSelectTab, viewModeFilter = 'all' }) {
+export default function ManageProductsView({ user, products, userPushedIds = [], onPushProduct, onOpenBulkUpload, onSelectTab, onSelectProduct, viewModeFilter = 'all' }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const categoryStripRef = React.useRef(null);
+
+  const scrollCategoryStrip = (direction) => {
+    if (categoryStripRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      categoryStripRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
   
   // Modal States
   const [viewDetailProduct, setViewDetailProduct] = useState(null);
@@ -22,13 +30,17 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
   const [customMarkupPrice, setCustomMarkupPrice] = useState(999);
   const [pushedSuccess, setPushedSuccess] = useState(false);
 
-  const categories = ['ALL', ...new Set(products.map(p => p.category))];
+  const categories = ['ALL', ...new Set((products || []).map(p => p.category).filter(Boolean))];
 
-  // If viewModeFilter is 'my', show ONLY user-pushed products (or empty array for new dropshipper)
-  const baseProductsList = viewModeFilter === 'my' ? [] : products;
+  // Show products catalog: Filter for pushed products if viewModeFilter === 'my'
+  const baseProductsList = viewModeFilter === 'my'
+    ? (products || []).filter(p => (userPushedIds || []).includes(p.id))
+    : (products || []);
 
   const filteredProducts = baseProductsList.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    const nameMatch = p.name ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) : false;
+    const skuMatch = p.sku ? p.sku.toLowerCase().includes(searchTerm.toLowerCase()) : false;
+    const matchesSearch = nameMatch || skuMatch;
     const matchesCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -41,6 +53,9 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
 
   const handlePushToShopify = (e) => {
     e.preventDefault();
+    if (selectedProductForShopify && onPushProduct) {
+      onPushProduct(selectedProductForShopify.id);
+    }
     setPushedSuccess(true);
     setTimeout(() => {
       setPushedSuccess(false);
@@ -88,33 +103,59 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-4">
         
-        <div className="relative w-full sm:w-80">
+        {/* Search Input */}
+        <div className="relative w-full lg:w-72 shrink-0">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
             type="text"
-            placeholder="Search by title or SKU..."
+            placeholder="Search by title or category..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl pl-10 pr-4 py-2.5 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl pl-10 pr-4 py-2.5 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-medium"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar py-1">
-          {categories.map((cat, idx) => (
-            <button
-              key={idx}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all ${
-                selectedCategory === cat
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-200'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        {/* CATEGORIES HORIZONTAL SCROLLER BOX WITH ARROW CONTROLS */}
+        <div className="flex items-center gap-2 w-full lg:w-auto bg-slate-50 p-1.5 rounded-2xl border border-slate-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => scrollCategoryStrip('left')}
+            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0 shadow-2xs"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div
+            ref={categoryStripRef}
+            className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-1 max-w-full"
+          >
+            {categories.map((cat, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all ${
+                  selectedCategory === cat
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 scale-[1.02]'
+                    : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100/80'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollCategoryStrip('right')}
+            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0 shadow-2xs"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
       </div>
@@ -129,7 +170,15 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
             return (
               <div
                 key={product.id}
-                onClick={() => { setViewDetailProduct(product); setActiveImageIndex(0); setCalcSellingPrice(product.suggestedMrp); }}
+                onClick={() => {
+                  if (onSelectProduct) {
+                    onSelectProduct(product);
+                  } else {
+                    setViewDetailProduct(product);
+                    setActiveImageIndex(0);
+                    setCalcSellingPrice(product.suggestedMrp);
+                  }
+                }}
                 className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:border-blue-500 hover:shadow-lg transition-all flex flex-col justify-between cursor-pointer group"
               >
                 <div>
@@ -158,13 +207,9 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
 
                   {/* Info Content */}
                   <div className="p-5">
-                    <h3 className="font-bold text-slate-900 text-sm line-clamp-2 leading-snug font-heading group-hover:text-blue-600 transition-colors mb-1">
+                    <h3 className="font-bold text-slate-900 text-sm line-clamp-2 leading-snug font-heading group-hover:text-blue-600 transition-colors mb-3">
                       {product.name}
                     </h3>
-
-                    <p className="text-[11px] text-slate-500 font-mono mb-3">
-                      SKU: {product.sku}
-                    </p>
 
                     {/* Financial Breakdown Card */}
                     <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1.5 text-xs text-slate-700 mb-4">
@@ -208,19 +253,26 @@ export default function ManageProductsView({ products, onOpenBulkUpload, onSelec
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4 shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4 shadow-sm max-w-lg mx-auto my-6">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto shadow-xs">
             <PackageCheck className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-extrabold text-slate-900 font-heading">No Pushed Products Yet</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            You haven't pushed any items to your Shopify store yet. Browse our 10,000+ wholesale catalog to push your first trending product!
-          </p>
+          <div className="space-y-1">
+            <h3 className="text-xl font-extrabold text-slate-900 font-heading">
+              {viewModeFilter === 'my' ? 'No Products Pushed To Your Store Yet' : 'No Products Found'}
+            </h3>
+            <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto leading-relaxed">
+              {viewModeFilter === 'my'
+                ? 'You have not pushed any products to your Shopify store yet. Browse our 9,000+ wholesale catalog and push high-margin products in just 1 click!'
+                : 'Try clearing your search query or selecting a different category filter.'}
+            </p>
+          </div>
           <button
             onClick={() => onSelectTab('all-products')}
-            className="btn-primary text-xs font-bold py-3 px-6 rounded-xl shadow-md shadow-blue-600/30"
+            className="btn-primary text-xs font-extrabold py-3 px-6 rounded-xl shadow-md shadow-blue-600/30 inline-flex items-center gap-2"
           >
-            Browse All Products Catalog →
+            <span>Browse All Wholesale Catalog</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       )}
