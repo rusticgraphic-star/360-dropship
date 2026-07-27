@@ -52,9 +52,9 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
       setStoreDomain(cleanedDomain);
       setSaveSuccess(true);
 
-      // REDIRECT DIRECTLY TO SHOPIFY ADMIN OAUTH PANEL IN NEW TAB
-      const shopifyOAuthUrl = `https://${cleanedDomain}/admin/oauth/authorize`;
-      window.open(shopifyOAuthUrl, '_blank');
+      // OPEN SHOPIFY ADMIN APPS DASHBOARD DIRECTLY WITHOUT OAUTH CLIENT_ID ERROR
+      const shopifyAdminUrl = `https://${cleanedDomain}/admin/apps`;
+      window.open(shopifyAdminUrl, '_blank');
 
       setTimeout(() => setSaveSuccess(false), 3500);
     }, 800);
