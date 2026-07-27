@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { 
   ShieldCheck, Upload, Landmark, Settings, Wallet, TrendingUp, Package, 
   Users, CheckCircle2, ArrowRight, DollarSign, RefreshCw, Key, FileSpreadsheet,
-  Plus, Edit, Trash2, Check, X, BarChart3
+  Plus, Edit, Trash2, Check, X, BarChart3, MessageSquare, AlertCircle, Search
 } from 'lucide-react';
+import { dbService } from '../services/dbService';
 
 export default function AdminDashboard({ 
   agencyUpiId, 
@@ -146,7 +147,34 @@ export default function AdminDashboard({
     setTimeout(() => setUpiSaved(false), 2500);
   };
 
-  const currentTab = activeTab || 'payout-approvals';
+  // Admin Dropshipper Accounts & WhatsApp Support Settings State
+  const [sellersList, setSellersList] = useState(() => (dbService.getSellers && dbService.getSellers()) || []);
+  const [adminSettings, setAdminSettings] = useState(() => (dbService.getAdminSettings && dbService.getAdminSettings()) || { whatsappNumber: '+919876543210' });
+  const [whatsappNumInput, setWhatsappNumInput] = useState((adminSettings && adminSettings.whatsappNumber) || '+919876543210');
+  const [whatsappSaved, setWhatsappSaved] = useState(false);
+  const [sellerSearch, setSellerSearch] = useState('');
+
+  const handleToggleSeller = (sellerId) => {
+    const updated = dbService.toggleSellerStatus(sellerId);
+    setSellersList(updated);
+  };
+
+  const handleSaveWhatsappSettings = (e) => {
+    e.preventDefault();
+    const updatedSettings = { ...adminSettings, whatsappNumber: whatsappNumInput };
+    dbService.saveAdminSettings(updatedSettings);
+    setAdminSettings(updatedSettings);
+    setWhatsappSaved(true);
+    setTimeout(() => setWhatsappSaved(false), 2500);
+  };
+
+  const currentTab = activeTab || 'dropshipper-management';
+
+  const filteredSellers = sellersList.filter(s => 
+    s.name?.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+    s.email?.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+    s.phone?.includes(sellerSearch)
+  );
 
   return (
     <div className="space-y-8 animate-fade-in text-slate-900 max-w-7xl mx-auto">
@@ -161,7 +189,7 @@ export default function AdminDashboard({
             360 Dropship Agency Admin Portal
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Manage product catalog, bulk upload 10k items, configure agency UPI receiver VPA, and release seller payouts.
+            Manage product catalog, verify & activate dropshippers, set WhatsApp support contact, and release seller payouts.
           </p>
         </div>
 
@@ -184,8 +212,139 @@ export default function AdminDashboard({
 
       {/* ADMIN CONTENT BASED ON VERTICAL LEFT SIDEBAR MENU TAB */}
       
+      {/* TAB: All Dropshippers & Account Verification Management */}
+      {(currentTab === 'dropshipper-management' || currentTab === 'admin-portal') && (
+        <div className="space-y-6">
+          
+          {/* Admin WhatsApp Support Number Configuration Card */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg font-heading flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-emerald-600" /> Admin WhatsApp Activation Contact Config
+                </h3>
+                <p className="text-xs text-slate-500">
+                  This WhatsApp number will be displayed on the 30-second popup for unverified dropshippers to contact you for activation.
+                </p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                WHATSAPP SUPPORT ACTIVE
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveWhatsappSettings} className="flex flex-col sm:flex-row items-end gap-4">
+              <div className="flex-1 w-full">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Official Admin WhatsApp Number (With Country Code) *
+                </label>
+                <div className="relative">
+                  <MessageSquare className="w-4 h-4 text-emerald-600 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    value={whatsappNumInput}
+                    onChange={(e) => setWhatsappNumInput(e.target.value)}
+                    placeholder="+919876543210"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl shadow-md flex items-center gap-2 shrink-0"
+              >
+                {whatsappSaved ? (
+                  <><CheckCircle2 className="w-4 h-4 text-white" /> Saved Successfully!</>
+                ) : (
+                  'Save Admin WhatsApp Number ✓'
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Dropshippers List Table */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg font-heading flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" /> All Registered Dropshippers ({sellersList.length})
+                </h3>
+                <p className="text-xs text-slate-500">Verify, Activate, or Deactivate dropshipper seller accounts in real time.</p>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={sellerSearch}
+                  onChange={(e) => setSellerSearch(e.target.value)}
+                  placeholder="Search seller by name or email..."
+                  className="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 font-medium focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-semibold">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                    <th className="p-3.5">Seller Name</th>
+                    <th className="p-3.5">Email Address</th>
+                    <th className="p-3.5">Phone Number</th>
+                    <th className="p-3.5">Registration Date</th>
+                    <th className="p-3.5">Account Status</th>
+                    <th className="p-3.5 text-right">Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredSellers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400 font-bold">
+                        No dropshippers found matching your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSellers.map((seller) => (
+                      <tr key={seller.id} className="hover:bg-slate-50">
+                        <td className="p-3.5 font-extrabold text-slate-900">{seller.name}</td>
+                        <td className="p-3.5 font-mono text-slate-700">{seller.email}</td>
+                        <td className="p-3.5 text-slate-700 font-mono">{seller.phone || '+91 9876543210'}</td>
+                        <td className="p-3.5 text-slate-500">{seller.createdAt || '2026-07-27'}</td>
+                        <td className="p-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
+                            seller.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {seller.status === 'ACTIVE' ? '● VERIFIED & ACTIVE' : '⏳ PENDING APPROVAL'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            onClick={() => handleToggleSeller(seller.id)}
+                            className={`text-xs font-extrabold py-2 px-4 rounded-xl shadow-xs transition-all ${
+                              seller.status === 'ACTIVE'
+                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
+                            }`}
+                          >
+                            {seller.status === 'ACTIVE' ? 'Deactivate / Mark Inactive ⏳' : 'Activate Dropshipper ✓'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
       {/* TAB 1: Payout Approval Desk */}
-      {(currentTab === 'payout-approvals' || currentTab === 'admin-portal') && (
+      {currentTab === 'payout-approvals' && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
           <div className="flex justify-between items-center border-b border-slate-200 pb-4">
             <div>
