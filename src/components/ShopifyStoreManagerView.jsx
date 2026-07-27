@@ -57,6 +57,9 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
   const userPushedProducts = user?.id ? dbService.getUserPushedProducts(user.id) : [];
 
   // 1-Click OAuth: redirect to our backend API which handles everything
+  // Shopify Custom App Install Link (from Partner Dashboard)
+  const SHOPIFY_INSTALL_URL = 'https://admin.shopify.com/oauth/install_custom_app?client_id=59b669059770244c0513bec02b008c6b&no_redirect=true&signature=eyJleHBpcmVzX2F0IjoxNzg1NzY5NzMyLCJwZXJtYW5lbnRfZG9tYWluIjoicXRuY3FnLXdzLm15c2hvcGlmeS5jb20iLCJjbGllbnRfaWQiOiI1OWI2NjkwNTk3NzAyNDRjMDUxM2JlYzAyYjAwOGM2YiIsInB1cnBvc2UiOiJjdXN0b21fYXBwIiwibWVyY2hhbnRfb3JnYW5pemF0aW9uX2lkIjoyMTg2OTgxNjB9--dab08856cc392c6dcc7a39ea921592b6566fb018';
+
   const handleOAuthConnect = (e) => {
     e.preventDefault();
     let cleanedDomain = storeDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
@@ -69,8 +72,24 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
     }
 
     setIsConnecting(true);
-    // Redirect to our Vercel serverless function which handles the OAuth redirect
-    window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(cleanedDomain)}`;
+
+    // Save domain locally first
+    if (user?.id) {
+      dbService.saveUserShopify(user.id, {
+        isConnected: false,
+        domain: cleanedDomain,
+        pendingConnect: true,
+        connectedAt: new Date().toISOString()
+      });
+    }
+
+    // Open Shopify install link — after install, use OAuth to get token
+    window.open(SHOPIFY_INSTALL_URL, '_blank');
+
+    // After opening install link, also trigger OAuth for token exchange
+    setTimeout(() => {
+      window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(cleanedDomain)}`;
+    }, 2000);
   };
 
   const handleDisconnect = () => {
