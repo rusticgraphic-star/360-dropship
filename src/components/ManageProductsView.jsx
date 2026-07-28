@@ -118,7 +118,14 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
         })
       });
 
-      const data = await response.json();
+      const rawText = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        setPushError('Invalid server response. Please make sure your store is connected properly in Shopify Store Manager.');
+        return;
+      }
 
       if (data.success) {
         // Save pushed product locally
@@ -132,7 +139,7 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
           setPushResult(null);
         }, 4000);
       } else {
-        setPushError(data.error || data.details?.errors ? JSON.stringify(data.details.errors) : 'Failed to push product. Check your store connection.');
+        setPushError(data.error || 'Failed to push product. Please verify your Shopify API token.');
       }
     } catch (err) {
       setPushError(`Network error: ${err.message}. Make sure your store is connected.`);
@@ -387,8 +394,8 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
 
       {/* DETAILED PRODUCT SPECS & IMAGES MODAL (DROPDASH STYLE FULLSCREEN OVERLAY) */}
       {viewDetailProduct && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
-          <div className="bg-slate-50 border border-slate-200 rounded-3xl max-w-6xl w-full text-slate-900 shadow-2xl overflow-hidden animate-fade-in my-auto">
+        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-slate-50 border border-slate-200 rounded-3xl max-w-5xl w-full text-slate-900 shadow-2xl overflow-hidden animate-fade-in max-h-[92vh] flex flex-col my-auto">
             
             {/* Top Navigation & Back Header */}
             <div className="p-4 sm:p-6 bg-white border-b border-slate-200 flex justify-between items-center">
@@ -622,8 +629,8 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
 
       {/* PUSH TO SHOPIFY MODAL */}
       {selectedProductForShopify && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full text-slate-900 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full text-slate-900 shadow-2xl space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-200 pb-3">
               <div>
                 <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider">1-Click Store Catalog Push</span>
