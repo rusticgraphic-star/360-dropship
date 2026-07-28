@@ -71,7 +71,14 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
         })
       });
 
-      const data = await response.json();
+      const rawText = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        setPushError('Invalid server response. Please make sure your store is connected properly in Shopify Store Manager.');
+        return;
+      }
 
       if (data.success) {
         if (onPushProduct && product?.id) onPushProduct(product.id);
@@ -79,7 +86,7 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
         setPushedToShopify(true);
         setTimeout(() => setPushedToShopify(false), 5000);
       } else {
-        setPushError(data.error || 'Failed to push product.');
+        setPushError(data.error || 'Failed to push product. Please verify your store token in Shopify Store Manager.');
       }
     } catch (err) {
       setPushError(`Network error: ${err.message}`);
