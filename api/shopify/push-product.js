@@ -51,20 +51,31 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
-  const { shop, token, product } = req.body || {};
-
-  if (!shop || !token || !product) {
-    return res.status(400).json({
-      error: 'Missing required fields: shop, token, product',
-    });
-  }
-
   try {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        body = {};
+      }
+    }
+    body = body || {};
+
+    const { shop, token, product } = body;
+
+    if (!shop || !token || !product) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: shop, token, or product. Make sure your store is connected in Shopify Store Manager.',
+      });
+    }
+
     // Clean shop domain - remove protocol and trailing slashes
-    const cleanShop = shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const cleanShop = String(shop).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const cleanToken = String(token).trim();
 
     console.log(`Pushing product to ${cleanShop}...`);
-    console.log(`Token starts with: ${token.substring(0, 8)}...`);
 
     // Build the images array
     let shopifyImages = [];
@@ -80,35 +91,30 @@ module.exports = async function handler(req, res) {
       compare_at_price: product.compare_at_price ? String(product.compare_at_price) : null,
       sku: product.sku || '',
       inventory_management: 'shopify',
-      inventory_quantity: product.stock || 100,
+      inventory_quantity: Number(product.stock) || 100,
       requires_shipping: true,
-      weight: product.weight || 0.5,
+      weight: 0.5,
       weight_unit: 'kg',
     }];
 
     const shopifyProduct = {
       product: {
-        title: product.title || product.name || 'Untitled Product',
-        body_html: product.description || '',
-        vendor: product.vendor || '360 Dropship',
-        product_type: product.product_type || product.category || '',
+        title: String(product.title || product.name || 'Untitled Product'),
+        body_html: String(product.description || ''),
+        vendor: '360 Dropship',
+        product_type: String(product.product_type || product.category || ''),
         status: 'active',
         variants: variants,
         images: shopifyImages,
-        tags: product.tags || '360dropship, dropshipping',
+        tags: '360dropship, dropshipping',
       }
     };
 
-    console.log('Shopify payload:', JSON.stringify(shopifyProduct).substring(0, 500));
-
     // Create product on Shopify
-    const response = await shopifyRequest(cleanShop, token, 'POST', '/products.json', shopifyProduct);
-
-    console.log('Shopify response status:', response.status);
-    console.log('Shopify response:', JSON.stringify(response.data).substring(0, 500));
+    const response = await shopifyRequest(cleanShop, cleanToken, 'POST', '/products.json', shopifyProduct);
 
     if (response.status === 201 || response.status === 200) {
-      const createdProduct = response.data.product;
+      const createdProduct = response.data && response.data.product ? response.data.product : {};
       return res.status(200).json({
         success: true,
         message: 'Product successfully pushed to Shopify!',
@@ -122,18 +128,23 @@ module.exports = async function handler(req, res) {
         }
       });
     } else {
-      return res.status(422).json({
+      let errorMsg = 'Failed to create product on Shopify.';
+      if (response.data && response.data.errors) {
+        errorMsg = typeof response.data.errors === 'string' 
+          ? response.data.errors 
+          : JSON.stringify(response.data.errors);
+      }
+      return res.status(200).json({
         success: false,
-        error: 'Failed to create product on Shopify',
-        details: response.data,
+        error: errorMsg,
         statusCode: response.status,
       });
     }
   } catch (err) {
     console.error('Push product error:', err);
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
-      error: err.message,
+      error: `Server error: ${err.message}`,
     });
   }
 };
