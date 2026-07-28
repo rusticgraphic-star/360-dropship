@@ -421,6 +421,7 @@ export default function App() {
         return (
           <ProductDetailView
             product={selectedProduct}
+            user={user}
             onBack={() => setActiveTab('all-products')}
             onSelectTab={setActiveTab}
             onPushProduct={handlePushProductToStore}
