@@ -33,6 +33,9 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
   const [selectedProductForShopify, setSelectedProductForShopify] = useState(null);
   const [customMarkupPrice, setCustomMarkupPrice] = useState(999);
   const [pushedSuccess, setPushedSuccess] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushError, setPushError] = useState('');
+  const [pushResult, setPushResult] = useState(null);
 
   const [sellerStatus, setSellerStatus] = useState(() => dbService.getSellerStatus(user?.email));
 
@@ -77,17 +80,65 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handlePushToShopify = (e) => {
+  const handlePushToShopify = async (e) => {
     e.preventDefault();
-    if (selectedProductForShopify && onPushProduct) {
-      onPushProduct(selectedProductForShopify.id);
+    if (!selectedProductForShopify) return;
+
+    // Get user's Shopify store connection
+    const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
+    if (!shopifyData || !shopifyData.isConnected || !shopifyData.domain || !shopifyData.token) {
+      setPushError('No Shopify store connected! Go to Shopify Store Manager to connect your store first.');
+      return;
     }
-    setPushedSuccess(true);
-    setTimeout(() => {
-      setPushedSuccess(false);
-      setSelectedProductForShopify(null);
-      setViewDetailProduct(null);
-    }, 1800);
+
+    setIsPushing(true);
+    setPushError('');
+    setPushResult(null);
+
+    try {
+      const response = await fetch('/api/shopify/push-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shop: shopifyData.domain,
+          token: shopifyData.token,
+          product: {
+            title: selectedProductForShopify.name,
+            description: selectedProductForShopify.description || '',
+            category: selectedProductForShopify.category || '',
+            price: customMarkupPrice,
+            compare_at_price: Math.round(customMarkupPrice * 1.4),
+            sku: selectedProductForShopify.sku || '',
+            stock: selectedProductForShopify.stock || 100,
+            image: selectedProductForShopify.image,
+            images: selectedProductForShopify.images || [selectedProductForShopify.image],
+            vendor: '360 Dropship',
+            tags: `360dropship, ${selectedProductForShopify.category || 'dropshipping'}`,
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Save pushed product locally
+        if (onPushProduct) onPushProduct(selectedProductForShopify.id);
+        setPushResult(data.shopifyProduct);
+        setPushedSuccess(true);
+        setTimeout(() => {
+          setPushedSuccess(false);
+          setSelectedProductForShopify(null);
+          setViewDetailProduct(null);
+          setPushResult(null);
+        }, 4000);
+      } else {
+        setPushError(data.error || data.details?.errors ? JSON.stringify(data.details.errors) : 'Failed to push product. Check your store connection.');
+      }
+    } catch (err) {
+      setPushError(`Network error: ${err.message}. Make sure your store is connected.`);
+    } finally {
+      setIsPushing(false);
+    }
   };
 
   // Multi-image thumbnails gallery generator
@@ -574,8 +625,15 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
                 <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider">1-Click Store Catalog Push</span>
                 <h3 className="font-extrabold text-base font-heading text-slate-900 line-clamp-1">{selectedProductForShopify.name}</h3>
               </div>
-              <button onClick={() => setSelectedProductForShopify(null)} className="text-slate-400 hover:text-slate-900">✕</button>
+              <button onClick={() => { setSelectedProductForShopify(null); setPushError(''); setPushResult(null); }} className="text-slate-400 hover:text-slate-900">✕</button>
             </div>
+
+            {pushError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{pushError}</span>
+              </div>
+            )}
 
             {!pushedSuccess ? (
               <form onSubmit={handlePushToShopify} className="space-y-4">
@@ -609,26 +667,41 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedProductForShopify(null)}
+                    onClick={() => { setSelectedProductForShopify(null); setPushError(''); }}
                     className="btn-secondary text-xs flex-1 py-3"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
+                    disabled={isPushing}
                     className="btn-primary text-xs flex-1 py-3 font-extrabold shadow-md shadow-blue-600/30"
                   >
-                    Push to Shopify Store ✓
+                    {isPushing ? (
+                      <><RefreshCw className="w-4 h-4 animate-spin" /> Pushing to Shopify...</>
+                    ) : (
+                      'Push to Shopify Store ✓'
+                    )}
                   </button>
                 </div>
               </form>
             ) : (
               <div className="text-center py-6 space-y-3">
                 <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto animate-bounce" />
-                <h4 className="font-extrabold text-lg font-heading text-slate-900">Product Successfully Pushed to Shopify!</h4>
+                <h4 className="font-extrabold text-lg font-heading text-slate-900">Product Live on Shopify! 🎉</h4>
                 <p className="text-xs text-slate-600">
-                  Item is now live on your Shopify store at ₹{customMarkupPrice}. Automated order sync active for warehouse dispatch.
+                  Item is now live on your Shopify store at ₹{customMarkupPrice}. Automated order sync active.
                 </p>
+                {pushResult && pushResult.url && (
+                  <a
+                    href={pushResult.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors"
+                  >
+                    View on Store →
+                  </a>
+                )}
               </div>
             )}
           </div>
