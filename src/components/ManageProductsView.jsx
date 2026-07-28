@@ -343,12 +343,16 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedProductForShopify(product);
-                      setCustomMarkupPrice(product.suggestedMrp);
+                      if (onSelectProduct) {
+                        onSelectProduct(product);
+                      } else {
+                        setSelectedProductForShopify(product);
+                        setCustomMarkupPrice(product.suggestedMrp);
+                      }
                     }}
-                    className="w-full btn-primary text-xs justify-center py-3 font-extrabold rounded-xl shadow-md shadow-blue-600/30"
+                    className="w-full btn-primary text-xs justify-center py-3 font-extrabold rounded-xl shadow-md shadow-blue-600/30 font-heading"
                   >
-                    {viewModeFilter === 'my' ? 'Update Price on Shopify →' : 'Push to Shopify Store →'}
+                    {viewModeFilter === 'my' ? 'View & Update Price →' : 'Push to Shopify Store →'}
                   </button>
                 </div>
 
