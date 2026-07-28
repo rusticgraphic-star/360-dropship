@@ -101,8 +101,8 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
     }
 
     const token = accessToken.trim();
-    if (!token || !token.startsWith('shpat_')) {
-      setConnectionError('Invalid token! Token must start with "shpat_". Follow the guide below to get your token.');
+    if (!token || token.length < 10) {
+      setConnectionError('Please enter a valid API access token. Follow the guide below to get your token.');
       return;
     }
 
