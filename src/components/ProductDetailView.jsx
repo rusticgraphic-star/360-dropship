@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { 
   ArrowLeft, Star, ShoppingBag, Zap, ShieldCheck, Truck, RefreshCw, 
   Share2, CheckCircle2, TrendingUp, DollarSign, Layers, ChevronRight,
-  ExternalLink, Copy, Check
+  ExternalLink, Copy, Check, AlertCircle
 } from 'lucide-react';
+import { dbService } from '../services/dbService';
 
-export default function ProductDetailView({ product, onBack, onSelectTab, onPushProduct }) {
+export default function ProductDetailView({ product, user, onBack, onSelectTab, onPushProduct }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [pushedToShopify, setPushedToShopify] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushError, setPushError] = useState('');
+  const [pushResult, setPushResult] = useState(null);
   const [copiedSku, setCopiedSku] = useState(false);
 
   if (!product) {
@@ -36,12 +40,52 @@ export default function ProductDetailView({ product, onBack, onSelectTab, onPush
   const totalCost = wholesaleCost + shippingFee;
   const estMargin = Math.max(0, suggestedMrp - totalCost - (suggestedMrp * 0.05));
 
-  const handlePushShopify = () => {
-    if (onPushProduct && product?.id) {
-      onPushProduct(product.id);
+  const handlePushShopify = async () => {
+    const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
+    if (!shopifyData || !shopifyData.isConnected || !shopifyData.domain || !shopifyData.token) {
+      setPushError('No Shopify store connected! Go to Shopify Store Manager first.');
+      return;
     }
-    setPushedToShopify(true);
-    setTimeout(() => setPushedToShopify(false), 3000);
+
+    setIsPushing(true);
+    setPushError('');
+
+    try {
+      const response = await fetch('/api/shopify/push-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shop: shopifyData.domain,
+          token: shopifyData.token,
+          product: {
+            title: product.name,
+            description: product.description || '',
+            category: product.category || '',
+            price: suggestedMrp,
+            compare_at_price: Math.round(suggestedMrp * 1.4),
+            sku: product.sku || '',
+            stock: product.stock || 100,
+            image: product.image,
+            images: product.images || [product.image],
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (onPushProduct && product?.id) onPushProduct(product.id);
+        setPushResult(data.shopifyProduct);
+        setPushedToShopify(true);
+        setTimeout(() => setPushedToShopify(false), 5000);
+      } else {
+        setPushError(data.error || 'Failed to push product.');
+      }
+    } catch (err) {
+      setPushError(`Network error: ${err.message}`);
+    } finally {
+      setIsPushing(false);
+    }
   };
 
   const handleCopySku = () => {
@@ -199,19 +243,56 @@ export default function ProductDetailView({ product, onBack, onSelectTab, onPush
               </div>
             </div>
 
+            {/* Push Error Alert */}
+            {pushError && (
+              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-bold flex items-start gap-2 animate-fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p>{pushError}</p>
+                  {pushError.includes('connected') && (
+                    <button onClick={() => onSelectTab('shopify-manager')} className="underline text-blue-600 font-extrabold mt-1 block">
+                      Go to Shopify Store Manager →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Custom Selling Price Setting */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <label className="font-extrabold text-slate-700 uppercase tracking-wider">Set Selling Price on Shopify (₹)</label>
+                <span className="text-emerald-600 font-bold">Est. Margin: ₹{(suggestedMrp - totalCost - (suggestedMrp * 0.05)).toFixed(0)}</span>
+              </div>
+              <input
+                type="number"
+                value={suggestedMrp}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (product) product.suggestedMrp = val;
+                }}
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 font-mono font-bold text-sm text-blue-600 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
             {/* Main Call to Actions */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-1">
               <button
                 onClick={handlePushShopify}
+                disabled={isPushing}
                 className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
                   pushedToShopify
                     ? 'bg-emerald-600 text-white shadow-emerald-600/30'
                     : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30'
                 }`}
               >
-                {pushedToShopify ? (
+                {isPushing ? (
                   <>
-                    <CheckCircle2 className="w-5 h-5" /> Product Pushed to Shopify Live!
+                    <RefreshCw className="w-5 h-5 animate-spin" /> Pushing Product to Shopify API...
+                  </>
+                ) : pushedToShopify ? (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" /> Live on Shopify Store! 🎉
                   </>
                 ) : (
                   <>
@@ -219,6 +300,17 @@ export default function ProductDetailView({ product, onBack, onSelectTab, onPush
                   </>
                 )}
               </button>
+
+              {pushResult && pushResult.url && (
+                <a
+                  href={pushResult.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-extrabold text-xs flex items-center justify-center gap-2 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" /> View Live Product on Your Shopify Store →
+                </a>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <button
