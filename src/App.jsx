@@ -260,7 +260,13 @@ export default function App() {
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
     setActiveTab('product-details');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
+
+  // Scroll to top whenever activeTab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab]);
 
   const handlePushProductToStore = (productId) => {
     if (user?.id && productId) {
