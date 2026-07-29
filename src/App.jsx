@@ -461,7 +461,7 @@ export default function App() {
           />
         );
       case 'manage-orders':
-        return <ManageOrdersView orders={orders} />;
+        return <ManageOrdersView orders={orders} user={user} />;
       case 'payouts':
         return <PayoutsView user={user} />;
       case 'shopify-manager':
