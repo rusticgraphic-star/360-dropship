@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShieldCheck, Upload, Landmark, Settings, Wallet, TrendingUp, Package, 
   Users, CheckCircle2, ArrowRight, DollarSign, RefreshCw, Key, FileSpreadsheet,
@@ -154,6 +154,26 @@ export default function AdminDashboard({
   const [whatsappSaved, setWhatsappSaved] = useState(false);
   const [sellerSearch, setSellerSearch] = useState('');
 
+  // Auto-refresh sellers list every 10 seconds and on storage events
+  const refreshSellersList = useCallback(() => {
+    try {
+      const freshSellers = dbService.getSellers ? dbService.getSellers() : [];
+      setSellersList(freshSellers);
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    refreshSellersList();
+    const interval = setInterval(refreshSellersList, 10000);
+    window.addEventListener('storage', refreshSellersList);
+    window.addEventListener('sellerStatusChanged', refreshSellersList);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', refreshSellersList);
+      window.removeEventListener('sellerStatusChanged', refreshSellersList);
+    };
+  }, [refreshSellersList]);
+
   const handleToggleSeller = (sellerId) => {
     const updated = dbService.toggleSellerStatus(sellerId);
     setSellersList(updated);
@@ -273,6 +293,14 @@ export default function AdminDashboard({
                 <p className="text-xs text-slate-500">Verify, Activate, or Deactivate dropshipper seller accounts in real time.</p>
               </div>
 
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={refreshSellersList}
+                  className="btn-secondary text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 shrink-0"
+                  title="Refresh dropshipper list"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                </button>
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
@@ -282,6 +310,7 @@ export default function AdminDashboard({
                   placeholder="Search seller by name or email..."
                   className="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 font-medium focus:outline-none focus:border-blue-500"
                 />
+              </div>
               </div>
             </div>
 

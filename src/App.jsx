@@ -86,26 +86,19 @@ export default function App() {
 
   const handleClosePendingModal = () => {
     try {
-      const emailKey = user?.email ? user.email.toLowerCase().trim() : 'user';
-      localStorage.setItem('360_dismissed_pending_modal_' + emailKey, 'true');
+      // Only session-based dismiss — shows again on new browser session
       sessionStorage.setItem('360_dismissed_pending_modal', 'true');
     } catch (e) {}
     setPendingApprovalModalOpen(false);
   };
 
-  // PERIODIC CHECK FOR INACTIVE DROPSHIPPERS (ONLY IF NOT DISMISSED)
+  // PERIODIC CHECK FOR INACTIVE DROPSHIPPERS — SHOWS ON ALL PAGES (session-dismiss only)
   useEffect(() => {
-    if (viewMode === 'dashboard') {
-      const emailKey = user?.email ? user.email.toLowerCase().trim() : 'user';
-      const isDismissedLocal = localStorage.getItem('360_dismissed_pending_modal_' + emailKey) === 'true';
-      const isDismissedSession = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
-      const currentStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
+    const isDismissedSession = sessionStorage.getItem('360_dismissed_pending_modal') === 'true';
+    const currentStatus = user?.email ? dbService.getSellerStatus(user.email) : 'ACTIVE';
 
-      if (currentStatus === 'INACTIVE' && !isDismissedLocal && !isDismissedSession) {
-        setPendingApprovalModalOpen(true);
-      } else {
-        setPendingApprovalModalOpen(false);
-      }
+    if (currentStatus === 'INACTIVE' && !isDismissedSession) {
+      setPendingApprovalModalOpen(true);
     } else {
       setPendingApprovalModalOpen(false);
     }
@@ -556,6 +549,30 @@ export default function App() {
             />
 
             <main className="p-4 sm:p-6 lg:p-8 flex-1">
+              {/* Persistent INACTIVE notice banner — cannot be dismissed */}
+              {sellerStatus === 'INACTIVE' && (
+                <div className="mb-4 bg-amber-50 border border-amber-300 p-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 text-xs font-medium shadow-sm animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⏳</span>
+                    <div>
+                      <p className="font-extrabold text-amber-950 text-xs">
+                        Limited Access — Account Pending Admin Approval
+                      </p>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        You can view only 50 products. Contact Admin on WhatsApp to unlock full 10,000+ catalog access.
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={`https://wa.me/${(adminSettings.whatsappNumber || '+919876543210').replace(/\D/g, '')}?text=Hello%20Admin,%20please%20activate%20my%20360%20Dropship%20account%20(${encodeURIComponent(user?.email || '')})`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] px-4 py-2 rounded-xl shadow-xs shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    💬 WhatsApp Admin
+                  </a>
+                </div>
+              )}
               {renderDashboardContent()}
             </main>
           </div>
@@ -621,7 +638,7 @@ export default function App() {
 
       {/* MODALS */}
       {/* 30-SECOND PENDING APPROVAL POPUP MODAL FOR INACTIVE DROPSHIPPERS */}
-      {viewMode === 'dashboard' && sellerStatus === 'INACTIVE' && pendingApprovalModalOpen && (
+      {sellerStatus === 'INACTIVE' && pendingApprovalModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-amber-200 text-slate-900 text-center relative overflow-hidden">
             
