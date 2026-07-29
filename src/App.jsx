@@ -240,7 +240,12 @@ export default function App() {
 
   // Application Data States
   const [walletBalance, setWalletBalance] = useState(3450);
-  const [agencyUpiId, setAgencyUpiId] = useState('360dropship@upi');
+  const [agencyUpiId, setAgencyUpiId] = useState(() => dbService.getAgencyUpiId());
+
+  const handleSaveUpiId = (newUpi) => {
+    setAgencyUpiId(newUpi);
+    dbService.saveAgencyUpiId(newUpi);
+  };
   const [products, setProducts] = useState(() => dbService.getProducts(INITIAL_PRODUCTS));
   const [campaigns, setCampaigns] = useState(INITIAL_META_CAMPAIGNS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
@@ -382,7 +387,7 @@ export default function App() {
       return (
         <AdminDashboard
           agencyUpiId={agencyUpiId}
-          onSaveUpiId={(newUpi) => setAgencyUpiId(newUpi)}
+          onSaveUpiId={handleSaveUpiId}
           orders={orders}
           products={products}
           onOpenBulkUpload={() => setBulkUploadModalOpen(true)}
@@ -622,7 +627,7 @@ export default function App() {
             <main className="p-6 flex-1 overflow-y-auto">
               <AdminDashboard
                 agencyUpiId={agencyUpiId}
-                onSaveUpiId={(newUpi) => setAgencyUpiId(newUpi)}
+                onSaveUpiId={handleSaveUpiId}
                 orders={orders}
                 products={products}
                 onOpenBulkUpload={() => setBulkUploadModalOpen(true)}

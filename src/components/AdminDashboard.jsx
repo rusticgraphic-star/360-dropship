@@ -30,6 +30,12 @@ export default function AdminDashboard({
   const [upiSaved, setUpiSaved] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState([]);
 
+  useEffect(() => {
+    if (agencyUpiId) {
+      setUpiIdInput(agencyUpiId);
+    }
+  }, [agencyUpiId]);
+
   const handleAdminLogin = (e) => {
     e.preventDefault();
     if (adminEmailInput.trim().toLowerCase() === adminEmail.toLowerCase() && adminAuthInput.trim() === adminPassword) {

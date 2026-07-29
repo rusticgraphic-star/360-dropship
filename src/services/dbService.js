@@ -238,6 +238,17 @@ export const dbService = {
     safeStorage.setItem('360_admin_settings', JSON.stringify(settings));
   },
 
+  // Agency UPI ID Persistence
+  getAgencyUpiId() {
+    return safeStorage.getItem('360_agency_upi_id') || '360dropship@upi';
+  },
+
+  saveAgencyUpiId(upiId) {
+    if (upiId) {
+      safeStorage.setItem('360_agency_upi_id', String(upiId).trim());
+    }
+  },
+
   // Seller Accounts List & Real User Status Isolation
   getSellers() {
     dbService.init();
