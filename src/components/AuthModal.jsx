@@ -20,6 +20,15 @@ export default function AuthModal({ isOpen, initialMode = 'signup', onClose, onL
   // Google Prompt State
   const [googlePromptOpen, setGooglePromptOpen] = useState(false);
 
+  // Sync mode whenever modal opens or initialMode prop changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setIsSignUp(initialMode === 'signup');
+      setErrorMessage('');
+      setVerificationSent(false);
+    }
+  }, [isOpen, initialMode]);
+
   if (!isOpen) return null;
 
   // Direct Password Signup / Login Handler
