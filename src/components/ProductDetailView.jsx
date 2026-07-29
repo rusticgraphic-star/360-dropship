@@ -13,6 +13,7 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
   const [pushError, setPushError] = useState('');
   const [pushResult, setPushResult] = useState(null);
   const [copiedSku, setCopiedSku] = useState(false);
+  const [customSellingPrice, setCustomSellingPrice] = useState(() => parseFloat(product?.suggestedMrp || 1299));
 
   if (!product) {
     return (
@@ -36,9 +37,8 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
 
   const wholesaleCost = parseFloat(product.wholesalePrice || 350);
   const shippingFee = parseFloat(product.shippingFee || 75);
-  const suggestedMrp = parseFloat(product.suggestedMrp || 1299);
   const totalCost = wholesaleCost + shippingFee;
-  const estMargin = Math.max(0, suggestedMrp - totalCost - (suggestedMrp * 0.05));
+  const estMargin = Math.max(0, customSellingPrice - totalCost - (customSellingPrice * 0.05));
 
   const handlePushShopify = async () => {
     const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
@@ -61,8 +61,8 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
             title: product.name,
             description: product.description || '',
             category: product.category || '',
-            price: suggestedMrp,
-            compare_at_price: Math.round(suggestedMrp * 1.4),
+            price: customSellingPrice,
+            compare_at_price: Math.round(customSellingPrice * 1.4),
             sku: product.sku || '',
             stock: product.stock || 100,
             image: product.image,
@@ -269,15 +269,12 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <label className="font-extrabold text-slate-700 uppercase tracking-wider">Set Selling Price on Shopify (₹)</label>
-                <span className="text-emerald-600 font-bold">Est. Margin: ₹{(suggestedMrp - totalCost - (suggestedMrp * 0.05)).toFixed(0)}</span>
+                <span className="text-emerald-600 font-bold">Est. Margin: ₹{estMargin.toFixed(0)}</span>
               </div>
               <input
                 type="number"
-                value={suggestedMrp}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  if (product) product.suggestedMrp = val;
-                }}
+                value={customSellingPrice}
+                onChange={(e) => setCustomSellingPrice(Number(e.target.value))}
                 className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 font-mono font-bold text-sm text-blue-600 focus:outline-none focus:border-blue-500"
               />
             </div>
