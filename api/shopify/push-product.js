@@ -1,5 +1,5 @@
 // Vercel Serverless Function: Push a product to connected Shopify store
-const https = require('https');
+import https from 'https';
 
 function shopifyRequest(shop, token, method, path, body = null) {
   return new Promise((resolve, reject) => {
@@ -37,7 +37,7 @@ function shopifyRequest(shop, token, method, path, body = null) {
   });
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -48,34 +48,22 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    return res.status(200).json({ success: false, error: 'Method not allowed. Use POST.' });
   }
 
   try {
-    let body = req.body;
-    if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        body = {};
-      }
-    }
-    body = body || {};
-
-    const { shop, token, product } = body;
+    const { shop, token, product } = req.body || {};
 
     if (!shop || !token || !product) {
-      return res.status(400).json({
+      return res.status(200).json({
         success: false,
-        error: 'Missing required fields: shop, token, or product. Make sure your store is connected in Shopify Store Manager.',
+        error: 'Missing required fields: shop, token, or product. Connect your store in Shopify Store Manager first.',
       });
     }
 
-    // Clean shop domain - remove protocol and trailing slashes
+    // Clean shop domain
     const cleanShop = String(shop).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const cleanToken = String(token).trim();
-
-    console.log(`Pushing product to ${cleanShop}...`);
 
     // Build the images array
     let shopifyImages = [];
@@ -130,8 +118,8 @@ module.exports = async function handler(req, res) {
     } else {
       let errorMsg = 'Failed to create product on Shopify.';
       if (response.data && response.data.errors) {
-        errorMsg = typeof response.data.errors === 'string' 
-          ? response.data.errors 
+        errorMsg = typeof response.data.errors === 'string'
+          ? response.data.errors
           : JSON.stringify(response.data.errors);
       }
       return res.status(200).json({
@@ -147,4 +135,4 @@ module.exports = async function handler(req, res) {
       error: `Server error: ${err.message}`,
     });
   }
-};
+}
