@@ -37,6 +37,7 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
 
   const wholesaleCost = parseFloat(product.wholesalePrice || 350);
   const shippingFee = parseFloat(product.shippingFee || 75);
+  const suggestedMrp = parseFloat(product.suggestedMrp || 1299);
   const totalCost = wholesaleCost + shippingFee;
   const estMargin = Math.max(0, customSellingPrice - totalCost - (customSellingPrice * 0.05));
 
