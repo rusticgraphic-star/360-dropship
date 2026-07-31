@@ -422,7 +422,10 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             <span className="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase h-fit shrink-0">Step 5</span>
             <div>
               <h4 className="font-bold text-emerald-300 text-sm mb-1">Install App & Copy Token ✅</h4>
-              <p className="text-slate-400">Click <strong className="text-emerald-400">"Install app"</strong> → Click <strong className="text-emerald-400">"Reveal token once"</strong> → Copy the <code className="text-emerald-400 bg-slate-700 px-1.5 py-0.5 rounded">shpat_...</code> token → Paste it above!</p>
+              <p className="text-slate-400">
+                Go to <code className="text-emerald-400 bg-slate-700 px-1.5 py-0.5 rounded">API credentials</code> tab → Click <strong className="text-emerald-400">"Install app"</strong> → Click <strong className="text-emerald-400">"Reveal token once"</strong>.<br />
+                <span className="text-amber-400 font-bold">⚠️ Note:</span> Copy the <code className="text-emerald-400 bg-slate-700 px-1.5 py-0.5 rounded">Admin API Access Token</code> (starts with <code className="text-emerald-400">shpat_</code>), NOT the API Secret Key (<code className="text-slate-400">shpss_</code>). Paste it above!
+              </p>
             </div>
           </div>
         </div>
