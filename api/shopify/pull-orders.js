@@ -31,6 +31,62 @@ function shopifyRequest(shop, token, method, path) {
   });
 }
 
+function shopifyOAuthPost(shop, path, body) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = JSON.stringify(body);
+    const options = {
+      hostname: shop,
+      port: 443,
+      path: `/admin/oauth${path}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyStr),
+      },
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, data: JSON.parse(data) });
+        } catch (e) {
+          resolve({ status: res.statusCode, data: data });
+        }
+      });
+    });
+    req.on('error', (err) => reject(err));
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function resolveAccessToken(shop, token) {
+  let cleanToken = String(token).trim();
+  if (cleanToken.startsWith('shpss_') || cleanToken.includes(':')) {
+    let clientId = process.env.SHOPIFY_API_KEY || '6ba2828599b7ed2b6c32dcb5e187652a';
+    let clientSecret = cleanToken;
+    if (cleanToken.includes(':')) {
+      const parts = cleanToken.split(':');
+      clientId = parts[0];
+      clientSecret = parts[1];
+    }
+    try {
+      const exchangeRes = await shopifyOAuthPost(shop, '/access_token', {
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+      });
+      if (exchangeRes.data && exchangeRes.data.access_token) {
+        return exchangeRes.data.access_token;
+      }
+    } catch (e) {
+      console.error('Client credentials grant failed:', e);
+    }
+  }
+  return cleanToken;
+}
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -60,7 +116,7 @@ export default async function handler(req, res) {
     if (!cleanShop.includes('.')) {
       cleanShop = `${cleanShop}.myshopify.com`;
     }
-    const cleanToken = String(token).trim();
+    const cleanToken = await resolveAccessToken(cleanShop, token);
 
     // Build query params
     const queryLimit = Math.min(Number(limit) || 50, 250);
