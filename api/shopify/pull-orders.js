@@ -56,7 +56,10 @@ export default async function handler(req, res) {
     }
 
     // Clean shop domain
-    const cleanShop = String(shop).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    let cleanShop = String(shop).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (!cleanShop.includes('.')) {
+      cleanShop = `${cleanShop}.myshopify.com`;
+    }
     const cleanToken = String(token).trim();
 
     // Build query params
@@ -117,7 +120,9 @@ export default async function handler(req, res) {
       });
     } else {
       let errorMsg = 'Failed to fetch orders from Shopify.';
-      if (response.data && response.data.errors) {
+      if (response.status === 401) {
+        errorMsg = 'Invalid Access Token or Store Domain. Make sure your token starts with "shpat_" and your store domain is "yourstore.myshopify.com". Re-connect in Shopify Store Sync.';
+      } else if (response.data && response.data.errors) {
         errorMsg = typeof response.data.errors === 'string'
           ? response.data.errors
           : JSON.stringify(response.data.errors);
