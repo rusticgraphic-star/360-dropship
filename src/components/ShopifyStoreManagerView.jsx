@@ -151,6 +151,20 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
   const hasStores = connectedStores.length > 0;
 
+  const handleOAuthConnect = (e) => {
+    e.preventDefault();
+    setConnectionError('');
+    let cleanedDomain = storeDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (!cleanedDomain) {
+      setConnectionError('Please enter your Shopify store URL (e.g. mystore.myshopify.com)');
+      return;
+    }
+    if (!cleanedDomain.includes('.myshopify.com') && !cleanedDomain.includes('.')) {
+      cleanedDomain = `${cleanedDomain}.myshopify.com`;
+    }
+    window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(cleanedDomain)}`;
+  };
+
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in text-slate-900 mx-auto">
       
@@ -181,87 +195,67 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             Connected Stores ({connectedStores.length})
           </h2>
 
-          {connectedStores.map((store) => (
-            <div key={store.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="grid gap-3">
+            {connectedStores.map((store) => (
+              <div key={store.id} className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold shrink-0">
                     <Store className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-slate-900 text-sm font-heading">{store.domain}</h3>
-                    <p className="text-[11px] text-slate-400">Connected {new Date(store.connectedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-slate-900 text-sm font-mono">{store.domain}</h3>
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> CONNECTED
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      1-Click Product Push Active • Auto Order Sync Enabled
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    CONNECTED
-                  </span>
+                <div className="flex items-center gap-2 border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0">
                   <a
                     href={`https://${store.domain}/admin`}
                     target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-blue-600 hover:text-blue-700 font-bold px-2.5 py-1 bg-blue-50 rounded-full border border-blue-200 flex items-center gap-1"
+                    rel="noreferrer"
+                    className="btn-secondary text-xs py-2 px-3 rounded-xl flex items-center gap-1 font-bold"
                   >
-                    <ExternalLink className="w-3 h-3" /> Admin
+                    <ExternalLink className="w-3.5 h-3.5" /> Admin
                   </a>
                   <button
                     onClick={() => handleDisconnectStore(store.id)}
-                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold px-2.5 py-1 bg-rose-50 rounded-full border border-rose-200 flex items-center gap-1"
+                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                    title="Disconnect Store"
                   >
-                    <Unlink className="w-3 h-3" /> Remove
+                    <Unlink className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-
-              {/* Store Stats */}
-              <div className="grid grid-cols-3 gap-3 mt-4 text-[11px]">
-                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
-                  <span className="text-slate-400 block">Products</span>
-                  <span className="font-extrabold text-blue-600 text-sm">{userPushedProducts.filter(p => p.storeDomain === store.domain).length || userPushedProducts.length}</span>
-                </div>
-                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
-                  <span className="text-slate-400 block">Sync</span>
-                  <span className="font-extrabold text-emerald-600 text-sm">Active</span>
-                </div>
-                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
-                  <span className="text-slate-400 block">Status</span>
-                  <span className="font-extrabold text-emerald-600 text-sm">Live</span>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {/* Add Another Store Button */}
-          {!showAddForm && (
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="w-full p-4 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/50 transition-all text-sm font-bold text-slate-500 hover:text-blue-600 flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Add Another Store
-            </button>
-          )}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Connect Form — shown if no stores OR showAddForm is true */}
-      {(!hasStores || showAddForm) && (
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+      {/* Add Store Form or Add Button */}
+      {hasStores && !showAddForm ? (
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="w-full py-4 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl text-slate-600 hover:text-blue-600 font-extrabold text-xs flex items-center justify-center gap-2 transition-all bg-slate-50/50 hover:bg-blue-50/50"
+        >
+          <Plus className="w-4 h-4" /> Add Another Shopify Store
+        </button>
+      ) : (
+        <div className="bg-white border border-slate-200 p-6 sm:p-8 rounded-3xl space-y-6 shadow-sm">
+          <div className="flex justify-between items-center border-b border-slate-200 pb-4">
             <div>
-              <div className="flex items-center gap-2">
-                <Key className="w-5 h-5 text-blue-600" />
-                <h3 className="font-extrabold text-slate-900 text-base font-heading">
-                  {hasStores ? 'Add Another Store' : 'Connect Your Shopify Store'}
-                </h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Enter your store domain and Admin API Access Token to connect.</p>
+              <h2 className="text-base font-extrabold text-slate-900 font-heading">Connect New Shopify Store</h2>
+              <p className="text-xs text-slate-500">Choose 1-Click Auto Connect or Manual Token Entry</p>
             </div>
-            {showAddForm && (
-              <button onClick={() => { setShowAddForm(false); setConnectionError(''); }} className="text-xs text-slate-400 hover:text-slate-600 font-bold">
-                ✕ Cancel
+            {hasStores && (
+              <button onClick={() => setShowAddForm(false)} className="text-xs text-slate-400 hover:text-slate-600 font-bold">
+                Cancel ✕
               </button>
             )}
           </div>
@@ -273,28 +267,56 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             </div>
           )}
 
+          {/* Store Domain Input Field */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Shopify Store URL / Handle *
+            </label>
+            <input
+              type="text"
+              required
+              value={storeDomain}
+              onChange={(e) => { setStoreDomain(e.target.value); setConnectionError(''); }}
+              placeholder="my-brand-store.myshopify.com"
+              className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* METHOD 1: 1-Click Automatic OAuth Connect */}
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Method 1 (Easiest)</span>
+                <h3 className="font-extrabold text-blue-950 text-xs">⚡ 1-Click Automatic Shopify Connect</h3>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              No manual token needed! Click below to log in with Shopify and grant permissions directly.
+            </p>
+            <button
+              type="button"
+              onClick={handleOAuthConnect}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-600/30 transition-all"
+            >
+              <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+              <span>1-Click Auto Connect via Shopify Login →</span>
+            </button>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 uppercase">OR (Manual Token)</span>
+            <div className="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          {/* METHOD 2: Manual Token Entry */}
           <form onSubmit={handleConnectStore} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                1. Shopify Store Domain *
-              </label>
-              <input
-                type="text"
-                required
-                value={storeDomain}
-                onChange={(e) => setStoreDomain(e.target.value)}
-                placeholder="my-brand-store.myshopify.com"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                2. Admin API Access Token (shpat_...) *
+                Method 2: Manual Admin API Access Token (shpat_...)
               </label>
               <input
                 type="password"
-                required
                 value={accessToken}
                 onChange={(e) => { setAccessToken(e.target.value); setConnectionError(''); }}
                 placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
@@ -306,12 +328,12 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             <button
               type="submit"
               disabled={isConnecting}
-              className="btn-primary w-full text-xs font-extrabold py-3.5 rounded-xl shadow-md shadow-blue-600/30 justify-center"
+              className="btn-secondary w-full text-xs font-extrabold py-3 rounded-xl justify-center"
             >
               {isConnecting ? (
                 <><RefreshCw className="w-4 h-4 animate-spin" /> Connecting Store...</>
               ) : (
-                '🔗 Connect Shopify Store'
+                '🔗 Connect with Token'
               )}
             </button>
           </form>
