@@ -85,6 +85,8 @@ async function resolveAccessToken(shop, token) {
       });
       if (exchangeRes.data && exchangeRes.data.access_token) {
         return exchangeRes.data.access_token;
+      } else {
+        console.error('Client credentials grant response:', exchangeRes.status, exchangeRes.data);
       }
     } catch (e) {
       console.error('Client credentials grant failed:', e);
@@ -177,7 +179,11 @@ export default async function handler(req, res) {
     } else {
       let errorMsg = 'Failed to create product on Shopify.';
       if (response.status === 401) {
-        errorMsg = 'Invalid Access Token or Store Domain. Make sure your token starts with "shpat_" and your store domain is "yourstore.myshopify.com". Re-connect in Shopify Store Sync.';
+        if (cleanToken.startsWith('shpss_')) {
+          errorMsg = 'Shopify rejected "shpss_" (Client Secret). Please use "⚡ 1-Click Auto Connect" OR paste a valid "shpat_" Access Token from your Store Admin (Settings -> Apps -> Develop Apps).';
+        } else {
+          errorMsg = 'Invalid Access Token or Store Domain. Make sure your token starts with "shpat_" and your store domain is "yourstore.myshopify.com". Re-connect in Shopify Store Sync.';
+        }
       } else if (response.data && response.data.errors) {
         errorMsg = typeof response.data.errors === 'string'
           ? response.data.errors
