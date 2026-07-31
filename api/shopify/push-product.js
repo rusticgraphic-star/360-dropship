@@ -70,26 +70,28 @@ function shopifyOAuthPost(shop, path, body) {
 async function resolveAccessToken(shop, token) {
   let cleanToken = String(token).trim();
   if (cleanToken.startsWith('shpss_') || cleanToken.includes(':')) {
-    let clientId = process.env.SHOPIFY_API_KEY || '6ba2828599b7ed2b6c32dcb5e187652a';
     let clientSecret = cleanToken;
+    let clientIds = ['6ba2828599b7ed2b6c32dcb5e187652a', 'b978a6c28b12cf8b24163b155a2bfff9'];
     if (cleanToken.includes(':')) {
       const parts = cleanToken.split(':');
-      clientId = parts[0];
+      clientIds = [parts[0]];
       clientSecret = parts[1];
     }
-    try {
-      const exchangeRes = await shopifyOAuthPost(shop, '/access_token', {
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: 'client_credentials',
-      });
-      if (exchangeRes.data && exchangeRes.data.access_token) {
-        return exchangeRes.data.access_token;
-      } else {
-        console.error('Client credentials grant response:', exchangeRes.status, exchangeRes.data);
+    for (const cid of clientIds) {
+      try {
+        const exchangeRes = await shopifyOAuthPost(shop, '/access_token', {
+          client_id: cid,
+          client_secret: clientSecret,
+          grant_type: 'client_credentials',
+        });
+        if (exchangeRes.data && exchangeRes.data.access_token) {
+          return exchangeRes.data.access_token;
+        } else {
+          console.error(`Client credentials exchange attempt failed for client_id ${cid}:`, exchangeRes.status, exchangeRes.data);
+        }
+      } catch (e) {
+        console.error(`Client credentials grant failed for ${cid}:`, e);
       }
-    } catch (e) {
-      console.error('Client credentials grant failed:', e);
     }
   }
   return cleanToken;
