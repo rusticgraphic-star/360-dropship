@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Store, CheckCircle2, RefreshCw, Key, AlertCircle, Unlink, HelpCircle, Plus, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Store, CheckCircle2, RefreshCw, Key, AlertCircle, Unlink, HelpCircle, Plus, ExternalLink, ShieldCheck, Zap } from 'lucide-react';
 import { dbService } from '../services/dbService';
 
 export default function ShopifyStoreManagerView({ user, onSelectTab }) {
