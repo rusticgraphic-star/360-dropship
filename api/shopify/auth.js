@@ -12,7 +12,7 @@ export default function handler(req, res) {
     cleanShop = `${cleanShop}.myshopify.com`;
   }
 
-  const apiKey = process.env.SHOPIFY_API_KEY || '6ba2828599b7ed2b6c32dcb5e187652a';
+  const apiKey = req.query.client_id || '6ba2828599b7ed2b6c32dcb5e187652a';
   const scopes = 'read_products,write_products,read_orders,write_orders,read_inventory,write_inventory';
   
   const redirectUri = 'https://www.360dropship.in/api/shopify/callback';

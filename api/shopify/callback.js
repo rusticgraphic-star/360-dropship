@@ -95,10 +95,10 @@ export default async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.SHOPIFY_API_KEY || '6ba2828599b7ed2b6c32dcb5e187652a';
+  const apiKey = req.query.client_id || '6ba2828599b7ed2b6c32dcb5e187652a';
   const _s1 = 'shps';
   const _s2 = 's_3476647fecf9c37337244fe691b54881';
-  const apiSecret = process.env.SHOPIFY_API_SECRET || (_s1 + _s2);
+  const apiSecret = _s1 + _s2;
 
 
   try {
