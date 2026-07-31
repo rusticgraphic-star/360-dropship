@@ -165,6 +165,25 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
     window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(cleanedDomain)}`;
   };
 
+  const handleCodeExchange = (e) => {
+    e.preventDefault();
+    setConnectionError('');
+    let cleanedDomain = storeDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (!cleanedDomain) {
+      setConnectionError('Please enter your Shopify store URL (e.g. mystore.myshopify.com)');
+      return;
+    }
+    if (!cleanedDomain.includes('.')) {
+      cleanedDomain = `${cleanedDomain}.myshopify.com`;
+    }
+    const cleanCode = accessToken.trim();
+    if (!cleanCode) {
+      setConnectionError('Please paste your Shopify authorization code or token');
+      return;
+    }
+    window.location.href = `/api/shopify/callback?shop=${encodeURIComponent(cleanedDomain)}&code=${encodeURIComponent(cleanCode)}`;
+  };
+
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in text-slate-900 mx-auto">
       
