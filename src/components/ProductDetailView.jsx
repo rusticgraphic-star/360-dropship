@@ -42,8 +42,12 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
   const estMargin = Math.max(0, customSellingPrice - totalCost - (customSellingPrice * 0.05));
 
   const handlePushShopify = async () => {
-    const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
-    if (!shopifyData || !shopifyData.isConnected || !shopifyData.domain || !shopifyData.token) {
+    const connectedStores = user?.id ? dbService.getUserShopifyStores(user.id) : [];
+    const legacyShopify = user?.id ? dbService.getUserShopify(user.id) : null;
+    
+    let targetStores = connectedStores.length > 0 ? connectedStores : (legacyShopify?.domain ? [legacyShopify] : []);
+
+    if (targetStores.length === 0) {
       setPushError('No Shopify store connected! Go to Shopify Store Manager first.');
       return;
     }
@@ -52,42 +56,49 @@ export default function ProductDetailView({ product, user, onBack, onSelectTab, 
     setPushError('');
 
     try {
-      const response = await fetch('/api/shopify/push-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop: shopifyData.domain,
-          token: shopifyData.token,
-          product: {
-            title: product.name,
-            description: product.description || '',
-            category: product.category || '',
-            price: customSellingPrice,
-            compare_at_price: Math.round(customSellingPrice * 1.4),
-            sku: product.sku || '',
-            stock: product.stock || 100,
-            image: product.image,
-            images: product.images || [product.image],
-          }
-        })
-      });
+      let lastResult = null;
+      let pushCount = 0;
 
-      const rawText = await response.text();
-      let data = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (parseErr) {
-        setPushError('Invalid server response. Please make sure your store is connected properly in Shopify Store Manager.');
-        return;
+      for (const store of targetStores) {
+        const response = await fetch('/api/shopify/push-product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shop: store.domain,
+            token: store.token,
+            product: {
+              title: product.name,
+              description: product.description || '',
+              category: product.category || '',
+              price: customSellingPrice,
+              compare_at_price: Math.round(customSellingPrice * 1.4),
+              sku: product.sku || '',
+              stock: product.stock || 100,
+              image: product.image,
+              images: product.images || [product.image],
+            }
+          })
+        });
+
+        const rawText = await response.text();
+        let data = {};
+        try { data = JSON.parse(rawText); } catch (e) {}
+
+        if (data.success) {
+          pushCount++;
+          lastResult = data.shopifyProduct;
+        } else {
+          setPushError(`Error pushing to ${store.domain}: ${data.error || 'Push failed'}`);
+          setIsPushing(false);
+          return;
+        }
       }
 
-      if (data.success) {
+      if (pushCount > 0) {
         if (onPushProduct && product?.id) onPushProduct(product.id);
-        setPushResult(data.shopifyProduct);
+        setPushResult(lastResult);
         setPushedToShopify(true);
         setTimeout(() => setPushedToShopify(false), 5000);
-      } else {
-        setPushError(data.error || 'Failed to push product. Please verify your store token in Shopify Store Manager.');
       }
     } catch (err) {
       setPushError(`Network error: ${err.message}`);

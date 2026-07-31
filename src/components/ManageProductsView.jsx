@@ -36,6 +36,8 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
   const [isPushing, setIsPushing] = useState(false);
   const [pushError, setPushError] = useState('');
   const [pushResult, setPushResult] = useState(null);
+  const [selectedTargetStoreDomain, setSelectedTargetStoreDomain] = useState('ALL');
+  const userStores = user?.id ? dbService.getUserShopifyStores(user.id) : [];
 
   const [sellerStatus, setSellerStatus] = useState(() => dbService.getSellerStatus(user?.email));
 
@@ -84,9 +86,20 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
     e.preventDefault();
     if (!selectedProductForShopify) return;
 
-    // Get user's Shopify store connection
-    const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
-    if (!shopifyData || !shopifyData.isConnected || !shopifyData.domain || !shopifyData.token) {
+    // Get user's connected Shopify stores
+    const connectedStores = user?.id ? dbService.getUserShopifyStores(user.id) : [];
+    const legacyShopify = user?.id ? dbService.getUserShopify(user.id) : null;
+    
+    let targetStores = [];
+    if (selectedTargetStoreDomain === 'ALL') {
+      targetStores = connectedStores.length > 0 ? connectedStores : (legacyShopify?.domain ? [legacyShopify] : []);
+    } else if (selectedTargetStoreDomain) {
+      targetStores = connectedStores.filter(s => s.domain === selectedTargetStoreDomain);
+    } else {
+      targetStores = connectedStores.length > 0 ? [connectedStores[0]] : (legacyShopify?.domain ? [legacyShopify] : []);
+    }
+
+    if (targetStores.length === 0) {
       setPushError('No Shopify store connected! Go to Shopify Store Manager to connect your store first.');
       return;
     }
@@ -96,41 +109,49 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
     setPushResult(null);
 
     try {
-      const response = await fetch('/api/shopify/push-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop: shopifyData.domain,
-          token: shopifyData.token,
-          product: {
-            title: selectedProductForShopify.name,
-            description: selectedProductForShopify.description || '',
-            category: selectedProductForShopify.category || '',
-            price: customMarkupPrice,
-            compare_at_price: Math.round(customMarkupPrice * 1.4),
-            sku: selectedProductForShopify.sku || '',
-            stock: selectedProductForShopify.stock || 100,
-            image: selectedProductForShopify.image,
-            images: selectedProductForShopify.images || [selectedProductForShopify.image],
-            vendor: '360 Dropship',
-            tags: `360dropship, ${selectedProductForShopify.category || 'dropshipping'}`,
-          }
-        })
-      });
+      let lastResult = null;
+      let pushCount = 0;
 
-      const rawText = await response.text();
-      let data = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (parseErr) {
-        setPushError('Invalid server response. Please make sure your store is connected properly in Shopify Store Manager.');
-        return;
+      for (const store of targetStores) {
+        const response = await fetch('/api/shopify/push-product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shop: store.domain,
+            token: store.token,
+            product: {
+              title: selectedProductForShopify.name,
+              description: selectedProductForShopify.description || '',
+              category: selectedProductForShopify.category || '',
+              price: customMarkupPrice,
+              compare_at_price: Math.round(customMarkupPrice * 1.4),
+              sku: selectedProductForShopify.sku || '',
+              stock: selectedProductForShopify.stock || 100,
+              image: selectedProductForShopify.image,
+              images: selectedProductForShopify.images || [selectedProductForShopify.image],
+              vendor: '360 Dropship',
+              tags: `360dropship, ${selectedProductForShopify.category || 'dropshipping'}`,
+            }
+          })
+        });
+
+        const rawText = await response.text();
+        let data = {};
+        try { data = JSON.parse(rawText); } catch (e) {}
+
+        if (data.success) {
+          pushCount++;
+          lastResult = data.shopifyProduct;
+        } else {
+          setPushError(`Error pushing to ${store.domain}: ${data.error || 'Push failed'}`);
+          setIsPushing(false);
+          return;
+        }
       }
 
-      if (data.success) {
-        // Save pushed product locally
+      if (pushCount > 0) {
         if (onPushProduct) onPushProduct(selectedProductForShopify.id);
-        setPushResult(data.shopifyProduct);
+        setPushResult(lastResult);
         setPushedSuccess(true);
         setTimeout(() => {
           setPushedSuccess(false);
@@ -138,8 +159,6 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
           setViewDetailProduct(null);
           setPushResult(null);
         }, 4000);
-      } else {
-        setPushError(data.error || 'Failed to push product. Please verify your Shopify API token.');
       }
     } catch (err) {
       setPushError(`Network error: ${err.message}. Make sure your store is connected.`);
@@ -662,6 +681,22 @@ export default function ManageProductsView({ user, products, userPushedIds = [],
                     <span>₹{(customMarkupPrice - (selectedProductForShopify.wholesalePrice + selectedProductForShopify.shippingFee) - (customMarkupPrice * 0.05)).toFixed(1)}</span>
                   </div>
                 </div>
+
+                {userStores.length > 1 && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Select Target Shopify Store *</label>
+                    <select
+                      value={selectedTargetStoreDomain}
+                      onChange={(e) => setSelectedTargetStoreDomain(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="ALL">✨ Push to ALL Connected Stores ({userStores.length} Stores)</option>
+                      {userStores.map(st => (
+                        <option key={st.id || st.domain} value={st.domain}>🏪 {st.domain}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Set Your Selling Price on Shopify (₹) *</label>

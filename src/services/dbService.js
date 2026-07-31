@@ -168,6 +168,24 @@ export const dbService = {
     try { return JSON.parse(str); } catch (e) { return { isConnected: false, domain: '', token: '' }; }
   },
 
+  getUserShopifyStores(userId) {
+    if (!userId) return [];
+    const str = safeStorage.getItem(`360_shopify_${userId}`);
+    if (!str) return [];
+    try {
+      const data = JSON.parse(str);
+      if (data.allStores && Array.isArray(data.allStores) && data.allStores.length > 0) {
+        return data.allStores;
+      }
+      if (data.isConnected && data.domain) {
+        return [{ id: 'store_1', domain: data.domain, token: data.token, connectedAt: data.connectedAt || new Date().toISOString(), isActive: true }];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
   saveUserShopify(userId, data) {
     if (userId) {
       safeStorage.setItem(`360_shopify_${userId}`, JSON.stringify(data));
