@@ -4,6 +4,6 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "env": {
-    "SHOPIFY_API_KEY": "59b669059770244c0513bec02b008c6b"
+    "SHOPIFY_API_KEY": "6ba2828599b7ed2b6c32dcb5e187652a"
   }
 }

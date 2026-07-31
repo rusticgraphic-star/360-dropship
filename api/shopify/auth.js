@@ -12,7 +12,7 @@ export default function handler(req, res) {
     cleanShop = `${cleanShop}.myshopify.com`;
   }
 
-  const apiKey = process.env.SHOPIFY_API_KEY || 'b978a6c28b12cf8b24163b155a2bfff9';
+  const apiKey = process.env.SHOPIFY_API_KEY || '6ba2828599b7ed2b6c32dcb5e187652a';
   const scopes = 'read_products,write_products,read_orders,write_orders,read_inventory,write_inventory';
   
   const host = req.headers['x-forwarded-host'] || req.headers.host || 'www.360dropship.in';

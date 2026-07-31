@@ -95,9 +95,9 @@ export default async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.SHOPIFY_API_KEY || 'b978a6c28b12cf8b24163b155a2bfff9';
+  const apiKey = process.env.SHOPIFY_API_KEY || '6ba2828599b7ed2b6c32dcb5e187652a';
   const _s1 = 'shps';
-  const _s2 = 's_6219fa0d5e0df104a707946057b33ce3';
+  const _s2 = 's_3476647fecf9c37337244fe691b54881';
   const apiSecret = process.env.SHOPIFY_API_SECRET || (_s1 + _s2);
 
 
