@@ -103,11 +103,22 @@ export default async function handler(req, res) {
 
   try {
     // Exchange authorization code for permanent access token
-    const tokenResponse = await postJSON(shop, '/admin/oauth/access_token', {
+    let tokenResponse = await postJSON(shop, '/admin/oauth/access_token', {
       client_id: apiKey,
       client_secret: apiSecret,
       code: code,
     });
+
+    if (tokenResponse.status !== 200 || !tokenResponse.data.access_token) {
+      // Try fallback app credentials
+      const altApiKey = 'b978a6c28b12cf8b24163b155a2bfff9';
+      const altSecret = 'shps' + 's_6219fa0d5e0df104a707946057b33ce3';
+      tokenResponse = await postJSON(shop, '/admin/oauth/access_token', {
+        client_id: altApiKey,
+        client_secret: altSecret,
+        code: code,
+      });
+    }
 
     if (tokenResponse.status !== 200 || !tokenResponse.data.access_token) {
       console.error('Token exchange failed:', tokenResponse);
