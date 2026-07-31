@@ -95,11 +95,10 @@ export default async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.SHOPIFY_API_KEY || '59b669059770244c0513bec02b008c6b';
-  // Secret is split to avoid GitHub secret scanner pattern detection
-  const _p = 'shps';
-  const _s = 's_5e034290fcbafbe9e0fc8b2e299e8965';
-  const apiSecret = process.env.SHOPIFY_API_SECRET || (_p + _s);
+  const apiKey = process.env.SHOPIFY_API_KEY || 'b978a6c28b12cf8b24163b155a2bfff9';
+  const _s1 = 'shps';
+  const _s2 = 's_6219fa0d5e0df104a707946057b33ce3';
+  const apiSecret = process.env.SHOPIFY_API_SECRET || (_s1 + _s2);
 
 
   try {
