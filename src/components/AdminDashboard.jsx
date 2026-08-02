@@ -194,6 +194,155 @@ export default function AdminDashboard({
     setTimeout(() => setWhatsappSaved(false), 2500);
   };
 
+  // Platform-Wide Orders Aggregation & Shopify Export State
+  const [platformOrders, setPlatformOrders] = useState(() => (dbService.getAllPlatformOrders ? dbService.getAllPlatformOrders() : []));
+  const [adminShopUrl, setAdminShopUrl] = useState(() => localStorage.getItem('360_admin_shopify_url') || '');
+  const [adminShopToken, setAdminShopToken] = useState(() => localStorage.getItem('360_admin_shopify_token') || '');
+  const [isPushingShopify, setIsPushingShopify] = useState(false);
+  const [pushStatusMsg, setPushStatusMsg] = useState('');
+
+  const refreshPlatformOrders = useCallback(() => {
+    if (dbService.getAllPlatformOrders) {
+      setPlatformOrders(dbService.getAllPlatformOrders());
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshPlatformOrders();
+    const orderInterval = setInterval(refreshPlatformOrders, 10000);
+    return () => clearInterval(orderInterval);
+  }, [refreshPlatformOrders]);
+
+  // Generate and Download Shopify Orders Import CSV
+  const handleExportShopifyCsv = () => {
+    const ordersToExport = platformOrders.length > 0 ? platformOrders : (orders || []);
+    if (ordersToExport.length === 0) {
+      alert('No orders available across dropshipper stores to export.');
+      return;
+    }
+
+    const headers = [
+      "Name", "Email", "Financial Status", "Fulfillment Status", "Currency", "Subtotal", "Shipping",
+      "Taxes", "Total", "Discount Code", "Discount Amount", "Shipping Method", "Created at",
+      "Lineitem quantity", "Lineitem name", "Lineitem price", "Lineitem sku",
+      "Billing Name", "Billing Address1", "Billing Address2", "Billing City", "Billing Zip", "Billing Province", "Billing Country", "Billing Phone",
+      "Shipping Name", "Shipping Address1", "Shipping Address2", "Shipping City", "Shipping Zip", "Shipping Province", "Shipping Country", "Shipping Phone",
+      "Notes", "Tags"
+    ];
+
+    const rows = ordersToExport.map((o, idx) => {
+      const customerName = o.customer_name || o.customer?.first_name || 'Customer';
+      const email = o.email || o.customer?.email || 'customer@360dropship.in';
+      const orderNum = o.order_number || o.id || `#360-${1000 + idx}`;
+      const totalPrice = o.total_price || o.sellingPrice || 999;
+      const createdAt = o.created_at || new Date().toISOString();
+      const productName = o.product_name || o.line_items?.[0]?.title || 'Dropship Product';
+      const sku = o.sku || o.line_items?.[0]?.sku || '';
+      const qty = o.quantity || o.line_items?.[0]?.quantity || 1;
+      const price = o.price || o.line_items?.[0]?.price || totalPrice;
+      const addr = o.shipping_address || {};
+      const sellerTag = `360Dropship, Seller:${o.sellerName || 'Dropshipper'}`;
+
+      return [
+        `"${orderNum}"`,
+        `"${email}"`,
+        '"paid"',
+        '"unfulfilled"',
+        '"INR"',
+        `"${totalPrice}"`,
+        '"0"',
+        '"0"',
+        `"${totalPrice}"`,
+        '""',
+        '"0"',
+        '"Standard Shipping"',
+        `"${createdAt}"`,
+        `"${qty}"`,
+        `"${productName.replace(/"/g, '""')}"`,
+        `"${price}"`,
+        `"${sku}"`,
+        `"${customerName}"`,
+        `"${(addr.address1 || o.address || '').replace(/"/g, '""')}"`,
+        `"${(addr.address2 || '').replace(/"/g, '""')}"`,
+        `"${addr.city || o.city || ''}"`,
+        `"${addr.zip || o.pincode || ''}"`,
+        `"${addr.province || o.state || ''}"`,
+        '"India"',
+        `"${o.phone || addr.phone || ''}"`,
+        `"${customerName}"`,
+        `"${(addr.address1 || o.address || '').replace(/"/g, '""')}"`,
+        `"${(addr.address2 || '').replace(/"/g, '""')}"`,
+        `"${addr.city || o.city || ''}"`,
+        `"${addr.zip || o.pincode || ''}"`,
+        `"${addr.province || o.state || ''}"`,
+        '"India"',
+        `"${o.phone || addr.phone || ''}"`,
+        `"${o.notes || 'Order placed on 360 Dropship Network'}"`,
+        `"${sellerTag}"`
+      ].join(',');
+    });
+
+    const csvString = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Shopify_Orders_Export_360Dropship_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Programmatically Create/Push Orders to Admin's Shopify Master Store
+  const handlePushOrdersToAdminShopify = async (e) => {
+    e.preventDefault();
+    if (!adminShopUrl.trim() || !adminShopToken.trim()) {
+      alert('Please enter Admin Shopify Store URL and Admin Access Token.');
+      return;
+    }
+
+    localStorage.setItem('360_admin_shopify_url', adminShopUrl.trim());
+    localStorage.setItem('360_admin_shopify_token', adminShopToken.trim());
+
+    const ordersToPush = platformOrders.length > 0 ? platformOrders : (orders || []);
+    if (ordersToPush.length === 0) {
+      alert('No orders available to push.');
+      return;
+    }
+
+    setIsPushingShopify(true);
+    setPushStatusMsg(`Pushing ${ordersToPush.length} orders to Admin Shopify Store...`);
+
+    let pushedCount = 0;
+    let failedCount = 0;
+
+    for (const ord of ordersToPush) {
+      try {
+        const res = await fetch('/api/shopify/push-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shop: adminShopUrl.trim(),
+            token: adminShopToken.trim(),
+            order: ord
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          pushedCount++;
+        } else {
+          failedCount++;
+        }
+      } catch (e) {
+        failedCount++;
+      }
+    }
+
+    setIsPushingShopify(false);
+    setPushStatusMsg(`Completed! Successfully Pushed: ${pushedCount} orders | Failed: ${failedCount}`);
+    setTimeout(() => setPushStatusMsg(''), 6000);
+  };
+
   const currentTab = activeTab || 'dropshipper-management';
 
   const filteredSellers = sellersList.filter(s => 
@@ -366,6 +515,137 @@ export default function AdminDashboard({
                           >
                             {seller.status === 'ACTIVE' ? 'Deactivate / Mark Inactive ⏳' : 'Activate Dropshipper ✓'}
                           </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB: All Dropshipper Orders & Shopify Import Export */}
+      {currentTab === 'all-orders-export' && (
+        <div className="space-y-6">
+          
+          {/* Action Header Card */}
+          <div className="bg-gradient-to-r from-blue-900 to-indigo-950 p-6 sm:p-8 rounded-3xl text-white shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-blue-800/80 pb-4">
+              <div>
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-emerald-500/40 uppercase mb-2 inline-block">
+                  SHOPIFY ORDERS EXPORT & AUTO-PUSH
+                </span>
+                <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-white">
+                  📦 All Dropshippers Live Orders Desk
+                </h2>
+                <p className="text-xs text-blue-200 mt-1">
+                  Export all orders collected across 100+ dropshipper stores in 1-Click Shopify Import CSV format, or auto-create orders in your Admin Shopify Store.
+                </p>
+              </div>
+
+              <button
+                onClick={handleExportShopifyCsv}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold py-3.5 px-6 rounded-2xl text-xs flex items-center justify-center gap-2.5 shadow-xl transition-all shrink-0"
+              >
+                <FileSpreadsheet className="w-5 h-5" />
+                <span>📥 Export All Orders (Shopify CSV Format) →</span>
+              </button>
+            </div>
+
+            {/* Auto-Push to Admin Shopify Store Form */}
+            <form onSubmit={handlePushOrdersToAdminShopify} className="bg-blue-950/80 p-4 sm:p-5 rounded-2xl border border-blue-800/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-extrabold text-xs text-cyan-300 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-cyan-400" /> Auto-Create Orders in Admin Shopify Master Store
+                </h4>
+                {pushStatusMsg && (
+                  <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/40">
+                    {pushStatusMsg}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <input
+                  type="text"
+                  value={adminShopUrl}
+                  onChange={(e) => setAdminShopUrl(e.target.value)}
+                  placeholder="admin-master.myshopify.com"
+                  className="sm:col-span-5 px-4 py-2.5 rounded-xl bg-slate-900 border border-blue-700/60 text-white font-mono font-bold text-xs focus:outline-none focus:border-cyan-400 placeholder-blue-300/40"
+                />
+                <input
+                  type="password"
+                  value={adminShopToken}
+                  onChange={(e) => setAdminShopToken(e.target.value)}
+                  placeholder="shpat_xxxxxxxx... (Admin Access Token)"
+                  className="sm:col-span-4 px-4 py-2.5 rounded-xl bg-slate-900 border border-blue-700/60 text-white font-mono font-bold text-xs focus:outline-none focus:border-cyan-400 placeholder-blue-300/40"
+                />
+                <button
+                  type="submit"
+                  disabled={isPushingShopify}
+                  className="sm:col-span-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                >
+                  {isPushingShopify ? <RefreshCw className="w-4 h-4 animate-spin" /> : '🚀 Auto-Create Orders'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Orders Table */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-4 shadow-sm">
+            <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+              <h3 className="font-extrabold text-slate-900 text-base font-heading">
+                All Platform Orders ({platformOrders.length} Total Orders)
+              </h3>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                100+ DROPSHIPPERS AGGREGATED
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-semibold">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                    <th className="p-3.5">Order ID</th>
+                    <th className="p-3.5">Seller (Dropshipper)</th>
+                    <th className="p-3.5">Customer Name & Phone</th>
+                    <th className="p-3.5">Product & SKU</th>
+                    <th className="p-3.5">Total Price</th>
+                    <th className="p-3.5">Shipping City / State</th>
+                    <th className="p-3.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {platformOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        No orders recorded yet across dropshipper stores.
+                      </td>
+                    </tr>
+                  ) : (
+                    platformOrders.map((ord, idx) => (
+                      <tr key={ord.id || idx} className="hover:bg-slate-50">
+                        <td className="p-3.5 font-bold font-mono text-slate-900">{ord.order_number || ord.id || `#360-${1000 + idx}`}</td>
+                        <td className="p-3.5 text-blue-700 font-extrabold">{ord.sellerName || ord.sellerEmail || 'Dropshipper'}</td>
+                        <td className="p-3.5 text-slate-900">
+                          <div>{ord.customer_name || ord.customer?.first_name || 'Customer'}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{ord.phone || ord.shipping_address?.phone || ''}</div>
+                        </td>
+                        <td className="p-3.5 text-slate-800 max-w-xs truncate">
+                          <div>{ord.product_name || ord.line_items?.[0]?.title || 'Dropship Product'}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{ord.sku || ord.line_items?.[0]?.sku || ''}</div>
+                        </td>
+                        <td className="p-3.5 font-extrabold text-emerald-600">₹{ord.total_price || ord.sellingPrice || 999}</td>
+                        <td className="p-3.5 text-slate-600">
+                          {ord.shipping_address?.city || ord.city || 'City'}, {ord.shipping_address?.province || ord.state || 'State'}
+                        </td>
+                        <td className="p-3.5">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {ord.financial_status || 'PAID / READY'}
+                          </span>
                         </td>
                       </tr>
                     ))

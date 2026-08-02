@@ -19,6 +19,7 @@ const DROPSHIPPER_MENU_ITEMS = [
 
 const ADMIN_MENU_ITEMS = [
   { id: 'dropshipper-management', label: 'All Dropshippers', icon: Users, badge: 'VERIFY' },
+  { id: 'all-orders-export', label: 'All Orders & Shopify Export', icon: ShoppingCart, badge: 'SHOPIFY' },
   { id: 'payout-approvals', label: 'Payout Release Desk', icon: Landmark, badge: 'PAYOUTS' },
   { id: 'admin-products', label: 'Add & Edit Products', icon: PlusCircle, badge: 'CATALOG' },
   { id: 'agency-settings', label: 'Agency UPI & Settings', icon: Settings, badge: 'UPI' },

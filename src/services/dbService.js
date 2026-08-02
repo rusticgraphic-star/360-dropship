@@ -146,6 +146,41 @@ export const dbService = {
     }
   },
 
+  // Aggregate All Orders Across 100+ Dropshippers for Admin Export
+  getAllPlatformOrders() {
+    dbService.init();
+    const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
+    let users = [];
+    try { users = JSON.parse(usersStr); } catch (e) { users = []; }
+
+    let allOrders = [];
+    const seenOrderIds = new Set();
+
+    for (const u of users) {
+      if (!u || !u.id) continue;
+      const userOrdersStr = safeStorage.getItem(`360_orders_${u.id}`) || '[]';
+      try {
+        const orders = JSON.parse(userOrdersStr);
+        if (Array.isArray(orders)) {
+          for (const o of orders) {
+            if (!o) continue;
+            const uniqueKey = o.id || `${o.order_number || o.id}_${u.id}`;
+            if (!seenOrderIds.has(uniqueKey)) {
+              seenOrderIds.add(uniqueKey);
+              allOrders.push({
+                ...o,
+                sellerId: u.id,
+                sellerName: u.name || u.email,
+                sellerEmail: u.email,
+              });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return allOrders;
+  },
+
   // Per-User Wallet Isolation
   getUserWallet(userId) {
     if (!userId) return 0;
