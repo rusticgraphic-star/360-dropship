@@ -292,79 +292,48 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             </div>
           )}
 
-          {/* Store Domain Input Field */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Shopify Store URL / Handle *
-            </label>
-            <input
-              type="text"
-              required
-              value={storeDomain}
-              onChange={(e) => { setStoreDomain(e.target.value); setConnectionError(''); }}
-              placeholder="my-brand-store.myshopify.com"
-              className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* METHOD 1: 1-Click Automatic OAuth Connect */}
-          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Method 1 (Easiest)</span>
-                <h3 className="font-extrabold text-blue-950 text-xs">⚡ 1-Click Automatic Shopify Connect</h3>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-600">
-              No manual token needed! Click below to log in with Shopify and grant permissions directly.
-            </p>
-            <button
-              type="button"
-              onClick={handleOAuthConnect}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-600/30 transition-all"
-            >
-              <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
-              <span>1-Click Auto Connect via Shopify Login →</span>
-            </button>
-          </div>
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 uppercase">OR (METHOD 2: CREDENTIALS ENTRY)</span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
-
-          {/* METHOD 2: Manual Credentials Entry (Store URL + Client ID + Token/Secret) */}
-          <form onSubmit={handleConnectStore} className="space-y-4 bg-slate-50/70 p-5 rounded-2xl border border-slate-200">
-            <div>
-              <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase mb-2 inline-block">Method 2 (Recommended for Dev Dashboard)</span>
-              <h3 className="font-extrabold text-slate-900 text-xs mb-3">🔑 Connect via Shopify Credentials (URL + Client ID + Token/Secret)</h3>
-            </div>
-
+          {/* UNIFIED SINGLE CONNECTION FORM */}
+          <form onSubmit={handleConnectStore} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                1. Client ID *
+                1. Shopify Store URL / Handle *
               </label>
               <input
                 type="text"
-                value={clientIdInput}
-                onChange={(e) => setClientIdInput(e.target.value)}
-                placeholder="e.g. 6ba2828599b7ed2b6c32dcb5e187652a"
-                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+                required
+                value={storeDomain}
+                onChange={(e) => { setStoreDomain(e.target.value); setConnectionError(''); }}
+                placeholder="my-brand-store.myshopify.com"
+                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Copy Client ID from your Shopify Dev Dashboard Settings or App Overview.</p>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                2. Client Secret / Access Token (shpss_... or shpat_...) *
+                2. Client ID *
+              </label>
+              <input
+                type="text"
+                required
+                value={clientIdInput}
+                onChange={(e) => setClientIdInput(e.target.value)}
+                placeholder="e.g. 6ba2828599b7ed2b6c32dcb5e187652a"
+                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Found in your Shopify Dev Dashboard Settings or App Overview.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                3. Client Secret / Access Token (shpss_... or shpat_...) *
               </label>
               <input
                 type="password"
+                required
                 value={accessToken}
                 onChange={(e) => { setAccessToken(e.target.value); setConnectionError(''); }}
                 placeholder="shpss_xxxxxxxx... OR shpat_xxxxxxxx..."
-                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
               />
               <p className="text-[11px] text-slate-400 mt-1">Paste your <code className="text-slate-700 font-bold">shpss_...</code> Client Secret or <code className="text-slate-700 font-bold">shpat_...</code> Access Token.</p>
             </div>
@@ -372,15 +341,30 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
             <button
               type="submit"
               disabled={isConnecting}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-600/30 transition-all mt-2"
             >
               {isConnecting ? (
                 <><RefreshCw className="w-4 h-4 animate-spin" /> Connecting Store...</>
               ) : (
-                '🔗 Connect Store Credentials'
+                '🚀 Connect Shopify Store'
               )}
             </button>
           </form>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 uppercase">OR (1-CLICK AUTO LOGIN)</span>
+            <div className="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOAuthConnect}
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-200 transition-all"
+          >
+            <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+            <span>⚡ 1-Click Connect via Shopify Login Redirect</span>
+          </button>
         </div>
       )}
 
