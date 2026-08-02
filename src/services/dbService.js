@@ -358,6 +358,19 @@ export const dbService = {
     }
   },
 
+  // Meta Agency Marketing API Credentials Persistence
+  getMetaApiCredentials() {
+    const str = safeStorage.getItem('360_meta_agency_creds');
+    if (!str) return { token: '', adAccountId: '' };
+    try { return JSON.parse(str); } catch (e) { return { token: '', adAccountId: '' }; }
+  },
+
+  saveMetaApiCredentials(creds) {
+    if (creds) {
+      safeStorage.setItem('360_meta_agency_creds', JSON.stringify(creds));
+    }
+  },
+
   // Seller Accounts List & Real User Status Isolation
   getSellers() {
     dbService.init();

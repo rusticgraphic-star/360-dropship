@@ -160,6 +160,24 @@ export default function AdminDashboard({
   const [whatsappSaved, setWhatsappSaved] = useState(false);
   const [sellerSearch, setSellerSearch] = useState('');
 
+  // Meta Agency API Settings State
+  const initialMetaCreds = dbService.getMetaApiCredentials ? dbService.getMetaApiCredentials() : { token: '', adAccountId: '' };
+  const [metaTokenInput, setMetaTokenInput] = useState(initialMetaCreds.token || '');
+  const [metaAdAccountIdInput, setMetaAdAccountIdInput] = useState(initialMetaCreds.adAccountId || '');
+  const [metaSaved, setMetaSaved] = useState(false);
+
+  const handleSaveMetaCreds = (e) => {
+    e.preventDefault();
+    if (dbService.saveMetaApiCredentials) {
+      dbService.saveMetaApiCredentials({
+        token: metaTokenInput.trim(),
+        adAccountId: metaAdAccountIdInput.trim()
+      });
+    }
+    setMetaSaved(true);
+    setTimeout(() => setMetaSaved(false), 3000);
+  };
+
   // Auto-refresh sellers list every 10 seconds and on storage events
   const refreshSellersList = useCallback(() => {
     try {
@@ -901,6 +919,68 @@ export default function AdminDashboard({
               Save Agency UPI Settings
             </button>
           </form>
+
+          {/* META AGENCY MARKETING API CREDENTIALS FORM */}
+          <div className="pt-6 border-t border-slate-200 space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg font-heading flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-blue-600" /> Meta Agency Marketing API Configuration
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Connect your Facebook Business Manager System User Access Token and Ad Account ID to auto-launch campaigns for dropshippers.
+                </p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                META GRAPH API v19.0
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveMetaCreds} className="space-y-4 max-w-2xl">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Meta System User Long-Lived Access Token (EAA...) *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={metaTokenInput}
+                  onChange={(e) => setMetaTokenInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500"
+                  placeholder="EAABwz1..."
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Generate in Meta Business Manager ➔ System Users ➔ Generate Token (with <b>ads_management</b> & <b>ads_read</b> permissions).</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Meta Agency Master Ad Account ID *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={metaAdAccountIdInput}
+                  onChange={(e) => setMetaAdAccountIdInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-blue-600 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+                  placeholder="act_123456789012345 or 123456789012345"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Found in Meta Ads Manager ➔ Settings ➔ Ad Account ID.</p>
+              </div>
+
+              {metaSaved && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold">
+                  ✓ Meta Agency Access Token & Ad Account ID successfully updated!
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn-primary text-xs font-extrabold py-3 px-6 rounded-xl shadow-md shadow-blue-600/30 flex items-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" /> Save Meta Agency API Credentials
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
