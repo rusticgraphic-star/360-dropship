@@ -330,48 +330,54 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
           <div className="relative flex py-1 items-center">
             <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 uppercase">OR (Manual Token)</span>
+            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 uppercase">OR (METHOD 2: CREDENTIALS ENTRY)</span>
             <div className="flex-grow border-t border-slate-200"></div>
           </div>
 
-          {/* METHOD 2: Manual Token Entry */}
-          <form onSubmit={handleConnectStore} className="space-y-4">
+          {/* METHOD 2: Manual Credentials Entry (Store URL + Client ID + Token/Secret) */}
+          <form onSubmit={handleConnectStore} className="space-y-4 bg-slate-50/70 p-5 rounded-2xl border border-slate-200">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Method 2: Manual Token / Secret Key (shpat_... or shpss_...)
-              </label>
-              <input
-                type="password"
-                value={accessToken}
-                onChange={(e) => { setAccessToken(e.target.value); setConnectionError(''); }}
-                placeholder="shpat_xxxxxxxx... OR shpss_xxxxxxxx..."
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
-              />
+              <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase mb-2 inline-block">Method 2 (Recommended for Dev Dashboard)</span>
+              <h3 className="font-extrabold text-slate-900 text-xs mb-3">🔑 Connect via Shopify Credentials (URL + Client ID + Token/Secret)</h3>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Client ID (Optional — Only required if using Dev Dashboard shpss_ secret)
+                1. Client ID *
               </label>
               <input
                 type="text"
                 value={clientIdInput}
                 onChange={(e) => setClientIdInput(e.target.value)}
                 placeholder="e.g. 6ba2828599b7ed2b6c32dcb5e187652a"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
               />
-              <p className="text-[11px] text-slate-400 mt-1">If using Dev Dashboard <code className="text-slate-600 font-bold">shpss_</code> key, paste your Client ID above. Otherwise leave blank!</p>
+              <p className="text-[11px] text-slate-400 mt-1">Copy Client ID from your Shopify Dev Dashboard Settings or App Overview.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                2. Client Secret / Access Token (shpss_... or shpat_...) *
+              </label>
+              <input
+                type="password"
+                value={accessToken}
+                onChange={(e) => { setAccessToken(e.target.value); setConnectionError(''); }}
+                placeholder="shpss_xxxxxxxx... OR shpat_xxxxxxxx..."
+                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Paste your <code className="text-slate-700 font-bold">shpss_...</code> Client Secret or <code className="text-slate-700 font-bold">shpat_...</code> Access Token.</p>
             </div>
 
             <button
               type="submit"
               disabled={isConnecting}
-              className="btn-secondary w-full text-xs font-extrabold py-3 rounded-xl justify-center"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all"
             >
               {isConnecting ? (
                 <><RefreshCw className="w-4 h-4 animate-spin" /> Connecting Store...</>
               ) : (
-                '🔗 Connect with Token'
+                '🔗 Connect Store Credentials'
               )}
             </button>
           </form>
