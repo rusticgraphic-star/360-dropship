@@ -5,6 +5,7 @@ import { dbService } from '../services/dbService';
 export default function ShopifyStoreManagerView({ user, onSelectTab }) {
   const [storeDomain, setStoreDomain] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [clientIdInput, setClientIdInput] = useState('');
   const [connectedStores, setConnectedStores] = useState([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
@@ -102,8 +103,13 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
 
     const token = accessToken.trim();
     if (!token || token.length < 10) {
-      setConnectionError('Please enter a valid API access token. Follow the guide below to get your token.');
+      setConnectionError('Please enter a valid API access token or secret. Follow the guide below to get your token.');
       return;
+    }
+
+    let finalToken = token;
+    if (clientIdInput.trim() && token.startsWith('shpss_') && !token.includes(':')) {
+      finalToken = `${clientIdInput.trim()}:${token}`;
     }
 
     setIsConnecting(true);
@@ -111,7 +117,7 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
     const newStore = {
       id: `store_${Date.now()}`,
       domain: cleanedDomain,
-      token: token,
+      token: finalToken,
       connectedAt: new Date().toISOString(),
       isActive: true
     };
@@ -332,16 +338,29 @@ export default function ShopifyStoreManagerView({ user, onSelectTab }) {
           <form onSubmit={handleConnectStore} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Method 2: Manual Admin API Access Token (shpat_...)
+                Method 2: Manual Token / Secret Key (shpat_... or shpss_...)
               </label>
               <input
                 type="password"
                 value={accessToken}
                 onChange={(e) => { setAccessToken(e.target.value); setConnectionError(''); }}
-                placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                placeholder="shpat_xxxxxxxx... OR shpss_xxxxxxxx..."
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Don't have a token? Follow the step-by-step guide below ↓</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Client ID (Optional — Only required if using Dev Dashboard shpss_ secret)
+              </label>
+              <input
+                type="text"
+                value={clientIdInput}
+                onChange={(e) => setClientIdInput(e.target.value)}
+                placeholder="e.g. 6ba2828599b7ed2b6c32dcb5e187652a"
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-blue-500"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">If using Dev Dashboard <code className="text-slate-600 font-bold">shpss_</code> key, paste your Client ID above. Otherwise leave blank!</p>
             </div>
 
             <button
