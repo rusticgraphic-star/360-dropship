@@ -64,7 +64,7 @@ export default function Hero({ onOpenAuth }) {
             </h1>
 
             <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed max-w-xl mx-auto lg:mx-0">
-              Instant access to <strong>10,000+ wholesale-priced products</strong>. Flat ₹75 shipping & RTO protection, agency-run Meta Ads engine, and direct bank payouts.
+              Instant access to <strong>10,000+ wholesale-priced products</strong>. Flat ₹75 shipping & <strong>ZERO RTO Fees</strong>, agency-run Meta Ads engine, and direct bank payouts.
             </p>
 
             {/* Quick Email Signup Form */}
@@ -90,7 +90,7 @@ export default function Hero({ onOpenAuth }) {
 
               <p className="text-xs text-slate-500 mt-3 font-medium flex items-center justify-center lg:justify-start gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                Google 1-Click & Email OTP supported. Zero upfront deposit.
+                Email & Mobile Password Login. Zero upfront deposit.
               </p>
             </div>
 

@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { HelpCircle, Send, CheckCircle2, MessageSquare, PhoneCall } from 'lucide-react';
+import { HelpCircle, Send, CheckCircle2, MessageSquare, PhoneCall, Zap } from 'lucide-react';
+import { dbService } from '../services/dbService';
 
 export default function RaiseTicketView() {
   const [subject, setSubject] = useState('');
   const [category, setCategory] = useState('Order Tracking');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  const adminSettings = dbService.getAdminSettings ? dbService.getAdminSettings() : { whatsappNumber: '+919876543210' };
+  const cleanWaNumber = (adminSettings.whatsappNumber || '919876543210').replace(/[^0-9]/g, '');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -26,8 +30,36 @@ export default function RaiseTicketView() {
           Support & Raise Ticket
         </h1>
         <p className="text-xs sm:text-sm text-slate-400">
-          Need help with orders, Shopify store sync, or Meta ad campaigns? Submit a ticket to our support desk.
+          Need help with orders, Shopify store sync, or Meta ad campaigns? Contact us via WhatsApp or submit a ticket.
         </p>
+      </div>
+
+      {/* Instant WhatsApp Support Banner */}
+      <div className="p-6 bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/40 rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30 shrink-0">
+            <MessageSquare className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-extrabold text-white text-base">Instant WhatsApp Desk</h3>
+              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30">ONLINE ⚡</span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Get 1-on-1 priority support on WhatsApp for quick resolution!
+            </p>
+          </div>
+        </div>
+
+        <a
+          href={`https://wa.me/${cleanWaNumber}?text=Hello%20360%20Dropship%20Support%2C%20I%20need%20help%20with%20my%20account.`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3 px-6 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all shrink-0"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Chat on WhatsApp →</span>
+        </a>
       </div>
 
       <div className="bg-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">

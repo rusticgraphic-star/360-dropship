@@ -7,8 +7,8 @@ export default function ProfitCalculator({ onOpenAuth }) {
   const [sellingPrice, setSellingPrice] = useState(999);
   const [adCostPerOrder, setAdCostPerOrder] = useState(150);
 
-  const shippingFee = 45;
-  const rtoFee = 30;
+  const shippingFee = 75;
+  const rtoFee = 0;
   const agencyFeePercent = 0.05;
 
   const agencyFeePerOrder = sellingPrice * agencyFeePercent;

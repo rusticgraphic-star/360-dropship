@@ -10,21 +10,8 @@ export default function Navbar({ onOpenAuth, onGoToDashboard, onGoToAdmin, isLog
         <div className="flex items-center justify-between h-20">
           
           {/* Brand Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-blue-500 to-cyan-400 text-white flex items-center justify-center font-black text-lg sm:text-xl shadow-lg shadow-blue-500/25 border border-white/20">
-              360
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 font-heading">
-                  360<span className="text-blue-600">Dropship</span>
-                </span>
-                <span className="bg-blue-50 text-blue-700 text-[9px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-200 uppercase tracking-wider">
-                  INDIA
-                </span>
-              </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium hidden sm:block">Automated E-Commerce & Sourcing Network</p>
-            </div>
+          <div className="flex items-center cursor-pointer py-1" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <img src="/logo.png" alt="360 Dropship" className="h-10 sm:h-12 w-auto object-contain" />
           </div>
 
           {/* Desktop Navigation Links */}

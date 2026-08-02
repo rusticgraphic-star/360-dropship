@@ -4,8 +4,8 @@ import { X, Calculator, RefreshCw, ShoppingBag, ChevronDown, ChevronUp, ArrowRig
 export default function ProfitCalculatorModal({ isOpen, onClose, product, onPushToShopify }) {
   if (!isOpen || !product) return null;
 
-  const appPrice = product.wholesalePrice + product.shippingFee;
-  const rtoCharge = 75;
+  const appPrice = product.wholesalePrice + (product.shippingFee || 75);
+  const rtoCharge = 0; // ZERO RTO Fees
 
   // Form Inputs
   const [sellingPrice, setSellingPrice] = useState(product.suggestedMrp || 1499);

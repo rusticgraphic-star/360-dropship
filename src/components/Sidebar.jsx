@@ -79,28 +79,10 @@ export default function Sidebar({
         {/* Top Section: Brand & Navigation */}
         <div>
           {/* Brand Header */}
-          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-400 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/20 border border-white/20">
-                360
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-base tracking-tight text-slate-900 font-heading">
-                    360<span className="text-blue-600">Dropship</span>
-                  </span>
-                </div>
-                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider block mt-0.5 ${
-                  userRole === 'admin'
-                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                }`}>
-                  {userRole === 'admin' ? 'AGENCY ADMIN' : 'DROPSHIPPER PANEL'}
-                </span>
-              </div>
+          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center">
+              <img src="/logo.png" alt="360 Dropship" className="h-10 w-auto object-contain" />
             </div>
-
-            {/* Mobile Close Button */}
             <button 
               onClick={onCloseMobile}
               className="lg:hidden p-1.5 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-slate-100"

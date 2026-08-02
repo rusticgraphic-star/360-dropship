@@ -16,11 +16,8 @@ export default function Header({ walletBalance, onOpenRechargeModal, onSelectTab
         </button>
 
         {/* Brand Mobile Logo */}
-        <div className="flex items-center gap-2 lg:hidden">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center">
-            360
-          </div>
-          <span className="font-extrabold text-sm text-slate-900 font-heading">360Dropship</span>
+        <div className="flex items-center lg:hidden">
+          <img src="/logo.png" alt="360 Dropship" className="h-8 w-auto object-contain" />
         </div>
 
         {/* Search Input */}

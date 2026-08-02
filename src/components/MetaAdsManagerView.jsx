@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, Zap, Wallet, Play, Pause, AlertTriangle, ShieldCheck, 
-  TrendingUp, ArrowUpRight, Plus, RefreshCw, FileText, CheckCircle2 
+  TrendingUp, ArrowUpRight, Plus, RefreshCw, FileText, CheckCircle2, Check, Target
 } from 'lucide-react';
+import { dbService } from '../services/dbService';
 
-export default function MetaAdsManagerView({ campaigns, walletBalance, onOpenRechargeModal, onToggleCampaignStatus }) {
+export default function MetaAdsManagerView({ user, campaigns, walletBalance, onOpenRechargeModal, onToggleCampaignStatus }) {
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [pixelIdInput, setPixelIdInput] = useState('');
+  const [savedPixelId, setSavedPixelId] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const currentUser = user || dbService.getCurrentUser();
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      const existingPixel = dbService.getUserMetaPixel(currentUser.id);
+      setPixelIdInput(existingPixel);
+      setSavedPixelId(existingPixel);
+    }
+  }, [currentUser]);
+
+  const handleSavePixel = (e) => {
+    e.preventDefault();
+    if (currentUser?.id && pixelIdInput.trim()) {
+      dbService.saveUserMetaPixel(currentUser.id, pixelIdInput.trim());
+      setSavedPixelId(pixelIdInput.trim());
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    }
+  };
 
   const totalSpent = campaigns.reduce((acc, c) => acc + c.totalSpent, 0);
   const totalConversions = campaigns.reduce((acc, c) => acc + c.conversions, 0);

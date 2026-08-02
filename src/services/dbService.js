@@ -220,6 +220,18 @@ export const dbService = {
     }
   },
 
+  // Per-User Meta Pixel ID Persistence
+  getUserMetaPixel(userId) {
+    if (!userId) return '';
+    return safeStorage.getItem(`360_meta_pixel_${userId}`) || '';
+  },
+
+  saveUserMetaPixel(userId, pixelId) {
+    if (userId) {
+      safeStorage.setItem(`360_meta_pixel_${userId}`, String(pixelId).trim());
+    }
+  },
+
   // Per-User Pushed Products Tracking
   getUserPushedProducts(userId) {
     if (!userId) return [];

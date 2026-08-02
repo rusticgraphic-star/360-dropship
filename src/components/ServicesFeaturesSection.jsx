@@ -55,13 +55,13 @@ export default function ServicesFeaturesSection({ onOpenAuth }) {
         },
         {
           icon: Truck,
-          title: 'Same-Day Dispatch & 2-4 Days Delivery',
-          desc: 'Orders dispatched within 12 hours with express Pan-India delivery via Delhivery, BlueDart & Xpressbees.'
+          title: 'Flat ₹75 Shipping Fee (Pan-India)',
+          desc: 'Deliver nationwide at a flat rate of ₹75 with same-day dispatch via Delhivery, BlueDart & Xpressbees.'
         },
         {
           icon: Shield,
-          title: 'Automated COD Verification Engine',
-          desc: 'Automated WhatsApp & IVR customer confirmation before dispatch reduces Return-To-Origin (RTO) below 8%.'
+          title: 'ZERO RTO Fees (100% Free RTO)',
+          desc: 'Never pay penalty fees on returned or un-delivered orders. 100% RTO protection guaranteed for all sellers!'
         },
         {
           icon: Layers,
