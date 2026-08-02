@@ -13,15 +13,21 @@ export default function ManageOrdersView({ orders, user }) {
 
   // Auto-sync on mount if connected
   useEffect(() => {
-    const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
-    if (shopifyData && shopifyData.isConnected && shopifyData.domain && shopifyData.token) {
+    const stores = user?.id ? dbService.getUserShopifyStores(user.id) : [];
+    const legacyShopify = user?.id ? dbService.getUserShopify(user.id) : null;
+    const hasConnection = stores.length > 0 || (legacyShopify && legacyShopify.isConnected);
+    if (hasConnection) {
       handleSyncOrders();
     }
   }, [user]);
 
   const handleSyncOrders = async () => {
-    const shopifyData = user?.id ? dbService.getUserShopify(user.id) : null;
-    if (!shopifyData || !shopifyData.isConnected || !shopifyData.domain || !shopifyData.token) {
+    const stores = user?.id ? dbService.getUserShopifyStores(user.id) : [];
+    const legacyShopify = user?.id ? dbService.getUserShopify(user.id) : null;
+    
+    let targetStores = stores.length > 0 ? stores : (legacyShopify?.domain ? [legacyShopify] : []);
+
+    if (targetStores.length === 0) {
       setSyncError('No Shopify store connected. Go to Shopify Store Sync to connect your store first.');
       return;
     }
@@ -30,35 +36,54 @@ export default function ManageOrdersView({ orders, user }) {
     setSyncError('');
 
     try {
-      const response = await fetch('/api/shopify/pull-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop: shopifyData.domain,
-          token: shopifyData.token,
-          status: 'any',
-          limit: 50,
-        })
-      });
+      let combinedOrders = [];
+      let syncErrors = [];
 
-      const rawText = await response.text();
-      let data = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        setSyncError('Invalid server response. Check your store connection.');
-        return;
+      for (const store of targetStores) {
+        try {
+          const response = await fetch('/api/shopify/pull-orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shop: store.domain,
+              token: store.token,
+              status: 'any',
+              limit: 50,
+            })
+          });
+
+          const rawText = await response.text();
+          let data = {};
+          try { data = JSON.parse(rawText); } catch (e) {}
+
+          if (data.success && data.orders) {
+            const storeTaggedOrders = data.orders.map(ord => ({
+              ...ord,
+              storeDomain: store.domain,
+            }));
+            combinedOrders = [...combinedOrders, ...storeTaggedOrders];
+          } else if (data.error) {
+            syncErrors.push(`${store.domain}: ${data.error}`);
+          }
+        } catch (e) {
+          syncErrors.push(`${store.domain}: ${e.message}`);
+        }
       }
 
-      if (data.success) {
-        setShopifyOrders(data.orders || []);
+      if (combinedOrders.length > 0 || syncErrors.length === 0) {
+        // Sort orders newest first
+        combinedOrders.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        setShopifyOrders(combinedOrders);
+        dbService.saveUserOrders(user?.id, combinedOrders);
         setLastSyncTime(new Date().toLocaleTimeString());
         setViewMode('shopify');
-      } else {
-        setSyncError(data.error || 'Failed to fetch orders from Shopify.');
+      }
+
+      if (syncErrors.length > 0 && combinedOrders.length === 0) {
+        setSyncError(`Order sync failed: ${syncErrors.join(', ')}`);
       }
     } catch (err) {
-      setSyncError(`Network error: ${err.message}`);
+      setSyncError(`Sync error: ${err.message}`);
     } finally {
       setIsSyncing(false);
     }
