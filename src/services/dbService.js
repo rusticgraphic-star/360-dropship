@@ -335,8 +335,37 @@ export const dbService = {
       email: u.email,
       phone: u.phone || '+91 9876543210',
       status: statusMap[u.id] || statusMap[u.email] || (u.email ? statusMap[u.email.toLowerCase().trim()] : null) || u.status || 'ACTIVE',
+      hasWinningAccess: dbService.hasWinningAccess(u.id) || dbService.hasWinningAccess(u.email),
       createdAt: u.createdAt ? u.createdAt.split('T')[0] : '2026-07-27'
     }));
+  },
+
+  // Per-User Winning Products Access Control
+  getWinningAccessMap() {
+    const str = safeStorage.getItem('360_sellers_winning_map') || '{}';
+    try { return JSON.parse(str); } catch (e) { return {}; }
+  },
+
+  hasWinningAccess(userIdOrEmail) {
+    if (!userIdOrEmail) return false;
+    const cleanKey = String(userIdOrEmail).toLowerCase().trim();
+    if (cleanKey === 'rustic241@gmail.com') return true;
+    const map = dbService.getWinningAccessMap();
+    return Boolean(map[cleanKey] || map[userIdOrEmail]);
+  },
+
+  toggleWinningAccess(sellerIdOrEmail) {
+    if (!sellerIdOrEmail) return false;
+    const cleanKey = String(sellerIdOrEmail).toLowerCase().trim();
+    const map = dbService.getWinningAccessMap();
+    const current = Boolean(map[cleanKey] || map[sellerIdOrEmail]);
+    map[cleanKey] = !current;
+    map[sellerIdOrEmail] = !current;
+    safeStorage.setItem('360_sellers_winning_map', JSON.stringify(map));
+    try {
+      window.dispatchEvent(new Event('winningAccessChanged'));
+    } catch (e) {}
+    return !current;
   },
 
   saveSellers(sellers) {

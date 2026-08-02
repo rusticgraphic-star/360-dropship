@@ -2,12 +2,13 @@ import React from 'react';
 import { 
   Home, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Settings, 
   Store, HelpCircle, UserCheck, ShieldCheck, Zap, LogOut, ShieldAlert,
-  FileSpreadsheet, PlusCircle, Landmark, BarChart3, X, CheckSquare, PackageCheck, Users
+  FileSpreadsheet, PlusCircle, Landmark, BarChart3, X, CheckSquare, PackageCheck, Users, Flame
 } from 'lucide-react';
 
 const DROPSHIPPER_MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard Home', icon: Home, badge: null },
   { id: 'all-products', label: 'All Products', icon: ShoppingBag, badge: '10K+' },
+  { id: 'winning-products', label: 'Winning Products', icon: Flame, badge: 'HOT 🔥' },
   { id: 'my-products', label: 'My Products', icon: PackageCheck, badge: 'STORE' },
   { id: 'manage-orders', label: 'My Orders & Tracking', icon: ShoppingCart, badge: null },
   { id: 'meta-ads', label: 'Meta Ads Manager', icon: TrendingUp, badge: 'AGENCY' },

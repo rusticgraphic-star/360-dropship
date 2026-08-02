@@ -185,6 +185,13 @@ export default function AdminDashboard({
     setSellersList(updated);
   };
 
+  const handleToggleWinning = (sellerId) => {
+    if (dbService.toggleWinningAccess) {
+      dbService.toggleWinningAccess(sellerId);
+      refreshSellersList();
+    }
+  };
+
   const handleSaveWhatsappSettings = (e) => {
     e.preventDefault();
     const updatedSettings = { ...adminSettings, whatsappNumber: whatsappNumInput };
@@ -478,13 +485,14 @@ export default function AdminDashboard({
                     <th className="p-3.5">Phone Number</th>
                     <th className="p-3.5">Registration Date</th>
                     <th className="p-3.5">Account Status</th>
+                    <th className="p-3.5">Winning Catalog Access</th>
                     <th className="p-3.5 text-right">Admin Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {filteredSellers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400 font-bold">
+                      <td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
                         No dropshippers found matching your search.
                       </td>
                     </tr>
@@ -503,6 +511,18 @@ export default function AdminDashboard({
                           }`}>
                             {seller.status === 'ACTIVE' ? '● VERIFIED & ACTIVE' : '⏳ PENDING APPROVAL'}
                           </span>
+                        </td>
+                        <td className="p-3.5">
+                          <button
+                            onClick={() => handleToggleWinning(seller.id || seller.email)}
+                            className={`text-[11px] font-extrabold py-1.5 px-3 rounded-xl border transition-all ${
+                              seller.hasWinningAccess
+                                ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            {seller.hasWinningAccess ? '🔥 UNLOCKED ✓' : '🔒 Grant Access'}
+                          </button>
                         </td>
                         <td className="p-3.5 text-right">
                           <button

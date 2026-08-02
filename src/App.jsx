@@ -22,6 +22,7 @@ import RaiseTicketView from './components/RaiseTicketView';
 import SourceProductModal from './components/SourceProductModal';
 import AdminDashboard from './components/AdminDashboard';
 import ProductDetailView from './components/ProductDetailView';
+import WinningProductsView from './components/WinningProductsView';
 import DynamicUpiQrModal from './components/DynamicUpiQrModal';
 import ExcelBulkUploadModal from './components/ExcelBulkUploadModal';
 import { dbService } from './services/dbService';
@@ -443,6 +444,15 @@ export default function App() {
             onSelectTab={setActiveTab}
             onSelectProduct={handleSelectProduct}
             viewModeFilter="all"
+          />
+        );
+      case 'winning-products':
+        return (
+          <WinningProductsView
+            user={user}
+            products={products}
+            onPushToShopify={handlePushProductToStore}
+            onSelectProduct={handleSelectProduct}
           />
         );
       case 'my-products':
