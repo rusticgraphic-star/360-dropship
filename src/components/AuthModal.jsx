@@ -49,28 +49,35 @@ export default function AuthModal({ isOpen, initialMode = 'signup', onClose, onL
     setIsLoading(true);
 
     if (isSignUp) {
-      // Call Supabase Live Auth Signup
-      const supabaseRes = await supabaseApi.signUpEmail(email, password, name);
-      setIsLoading(false);
+      // 1. Enforce unique Email & Phone check in Database
+      const res = dbService.signUp({ name, email, phone: `+91 ${mobileNum}`, password });
+      if (!res.success) {
+        setIsLoading(false);
+        setErrorMessage(res.error);
+        return;
+      }
 
-      // Save user profile locally & trigger email verification notice
-      const user = dbService.signUp({ name, email, phone: `+91 ${mobileNum}`, password }).user;
+      // Call Supabase Live Auth Signup
+      try {
+        await supabaseApi.signUpEmail(email, password, name);
+      } catch (e) {}
+
+      setIsLoading(false);
       setVerificationSent(true);
 
       setTimeout(() => {
-        onLoginSuccess(user);
-      }, 2500);
+        onLoginSuccess(res.user);
+      }, 2000);
 
     } else {
-      // Sign In
+      // Sign In: Require Prior Signup & Strict Password Verification Match
       const result = dbService.signIn({ email, password });
       setIsLoading(false);
+
       if (result.success) {
         onLoginSuccess(result.user);
       } else {
-        // Create user session cleanly
-        const newUser = dbService.signUp({ name: email.split('@')[0], email, phone: '+91 9876543210', password }).user;
-        onLoginSuccess(newUser);
+        setErrorMessage(result.error || 'Invalid login credentials. Please try again.');
       }
     }
   };

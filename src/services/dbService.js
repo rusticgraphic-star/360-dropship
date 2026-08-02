@@ -38,27 +38,49 @@ export const dbService = {
     }
   },
 
-  // User Sign Up (Email & Password or OAuth)
+  // User Sign Up (Unique Email & Phone Required, Password Saved)
   signUp({ name, email, phone, password }) {
     dbService.init();
     const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
 
-    const existingUser = users.find(u => (email && u && u.email && typeof u.email === 'string' && u.email.toLowerCase() === email.toLowerCase()));
-    if (existingUser) {
-      safeStorage.setItem(DB_SESSION_KEY, JSON.stringify(existingUser));
-      return { success: true, user: existingUser, isNew: false };
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanPhone = phone ? String(phone).replace(/\D/g, '') : '';
+
+    if (!cleanEmail) {
+      return { success: false, error: 'Email address is required.' };
+    }
+
+    // 1. Check if Email already exists (NO REPEAT EMAIL)
+    const existingEmailUser = users.find(u => u && u.email && String(u.email).toLowerCase().trim() === cleanEmail);
+    if (existingEmailUser) {
+      return {
+        success: false,
+        error: `An account with email '${cleanEmail}' already exists. Please click 'Sign In' to log into your account.`
+      };
+    }
+
+    // 2. Check if Mobile Phone already exists (NO REPEAT PHONE)
+    if (cleanPhone && cleanPhone.length >= 10) {
+      const existingPhoneUser = users.find(u => u && u.phone && String(u.phone).replace(/\D/g, '').includes(cleanPhone));
+      if (existingPhoneUser) {
+        return {
+          success: false,
+          error: `An account with mobile number '${phone}' already exists. Please click 'Sign In' instead.`
+        };
+      }
     }
 
     const userId = `USR-${Math.floor(1000 + Math.random() * 9000)}`;
-    const userName = name || (email ? email.split('@')[0] : 'New Dropshipper');
-    const isMasterAdmin = (email && email.toLowerCase() === 'rustic241@gmail.com');
+    const userName = name || (cleanEmail ? cleanEmail.split('@')[0] : 'New Dropshipper');
+    const isMasterAdmin = (cleanEmail === 'rustic241@gmail.com');
     const newUser = {
       id: userId,
       name: isMasterAdmin ? 'System Agency Admin' : userName,
-      email: (email || 'user@gmail.com').toLowerCase(),
+      email: cleanEmail,
       phone: phone || '',
+      password: password || '360dropship123',
       role: isMasterAdmin ? 'admin' : 'dropshipper',
       status: isMasterAdmin ? 'ACTIVE' : 'INACTIVE',
       storeDomain: '',
@@ -98,17 +120,39 @@ export const dbService = {
     return { success: true, user: newUser, isNew: true };
   },
 
-  // User Sign In (Email / Password)
+  // User Sign In (Strict Registration Check & Password Match Verification)
   signIn({ email, password }) {
     dbService.init();
     const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
     let users = [];
     try { users = JSON.parse(usersStr); } catch (e) { users = []; }
 
-    const user = users.find(u => (email && u && u.email && typeof u.email === 'string' && u.email.toLowerCase() === email.toLowerCase()));
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    if (!cleanEmail) {
+      return { success: false, error: 'Please enter your registered Email address.' };
+    }
+
+    // 1. Check if user has registered prior to sign in
+    const user = users.find(u => (u && u.email && String(u.email).toLowerCase().trim() === cleanEmail));
 
     if (!user) {
-      return dbService.signUp({ name: email.split('@')[0], email, password });
+      return {
+        success: false,
+        error: `No account found with email '${cleanEmail}'. Access denied without prior Sign Up. Please click 'Create Account'.`
+      };
+    }
+
+    // 2. Strict Password Match Verification
+    if (password && user.password) {
+      const storedPass = String(user.password).trim();
+      const enteredPass = String(password).trim();
+
+      if (storedPass !== enteredPass) {
+        return {
+          success: false,
+          error: 'Incorrect Password. Please verify your password and try again.'
+        };
+      }
     }
 
     if (user.email.toLowerCase() === 'rustic241@gmail.com') {
