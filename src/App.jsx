@@ -416,6 +416,8 @@ export default function App() {
       case 'meta-ads':
         return (
           <MetaAdsManagerView
+            user={user}
+            products={products}
             campaigns={campaigns}
             walletBalance={walletBalance}
             onOpenRechargeModal={() => setRechargeModalOpen(true)}
