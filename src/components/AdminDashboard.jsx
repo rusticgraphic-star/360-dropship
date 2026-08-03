@@ -210,6 +210,40 @@ export default function AdminDashboard({
     }
   };
 
+  // Wallet Top-Up Requests State & Admin Approval Handlers
+  const [topupRequests, setTopupRequests] = useState(() => (dbService.getWalletTopupRequests ? dbService.getWalletTopupRequests() : []));
+
+  const refreshTopupRequests = useCallback(() => {
+    if (dbService.getWalletTopupRequests) {
+      setTopupRequests(dbService.getWalletTopupRequests());
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshTopupRequests();
+    const interval = setInterval(refreshTopupRequests, 8000);
+    return () => clearInterval(interval);
+  }, [refreshTopupRequests]);
+
+  const handleApproveTopup = (requestId) => {
+    if (dbService.approveWalletTopupRequest) {
+      const res = dbService.approveWalletTopupRequest(requestId);
+      if (res.success) {
+        refreshTopupRequests();
+        refreshSellersList();
+      }
+    }
+  };
+
+  const handleRejectTopup = (requestId) => {
+    if (dbService.rejectWalletTopupRequest) {
+      const res = dbService.rejectWalletTopupRequest(requestId);
+      if (res.success) {
+        refreshTopupRequests();
+      }
+    }
+  };
+
   const handleSaveWhatsappSettings = (e) => {
     e.preventDefault();
     const updatedSettings = { ...adminSettings, whatsappNumber: whatsappNumInput };
@@ -237,6 +271,50 @@ export default function AdminDashboard({
     const orderInterval = setInterval(refreshPlatformOrders, 10000);
     return () => clearInterval(orderInterval);
   }, [refreshPlatformOrders]);
+
+  // Roposo Clout Courier Status CSV Import & Status Update Handlers
+  const handleRoposoCsvUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length <= 1) {
+        alert('CSV file is empty or missing data rows.');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+      const rows = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
+        if (values.length >= headers.length) {
+          const rowObj = {};
+          headers.forEach((h, idx) => {
+            rowObj[h] = values[idx];
+          });
+          rows.push(rowObj);
+        }
+      }
+
+      if (dbService.bulkSyncRoposoOrderStatuses) {
+        const count = dbService.bulkSyncRoposoOrderStatuses(rows);
+        alert(`Successfully synced ${count} order statuses from Roposo Clout CSV!`);
+        refreshPlatformOrders();
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleUpdateSingleOrderStatus = (sellerId, orderId, newStatus, awbCode) => {
+    if (dbService.updateOrderStatus) {
+      dbService.updateOrderStatus(sellerId, orderId, newStatus, awbCode);
+      refreshPlatformOrders();
+    }
+  };
 
   // Generate and Download Shopify Orders Import CSV
   const handleExportShopifyCsv = () => {
@@ -494,33 +572,130 @@ export default function AdminDashboard({
               </div>
             </div>
 
+          {/* WALLET RECHARGE APPROVAL DESK CARD */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg font-heading flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-emerald-600" /> Ad Wallet Top-Up Verification & Approval Desk
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Review dropshippers' payment UTR submissions. Balance updates ONLY after Admin approval.
+                </p>
+              </div>
+              <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {topupRequests.filter(r => r.status === 'PENDING').length} PENDING VERIFICATIONS
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-semibold">
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    <th className="p-3.5">Seller Name</th>
-                    <th className="p-3.5">Email Address</th>
-                    <th className="p-3.5">Phone Number</th>
-                    <th className="p-3.5">Registration Date</th>
-                    <th className="p-3.5">Account Status</th>
-                    <th className="p-3.5">Winning Catalog Access</th>
-                    <th className="p-3.5 text-right">Admin Action</th>
+                    <th className="p-3.5">Request ID</th>
+                    <th className="p-3.5">User ID & Dropshipper</th>
+                    <th className="p-3.5">Net Budget</th>
+                    <th className="p-3.5">Total Paid (18% GST)</th>
+                    <th className="p-3.5">UPI UTR Number</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Verification Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filteredSellers.length === 0 ? (
+                  {topupRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
-                        No dropshippers found matching your search.
+                      <td colSpan={7} className="p-6 text-center text-slate-400 font-bold">
+                        No ad wallet recharge requests submitted yet.
                       </td>
                     </tr>
                   ) : (
-                    filteredSellers.map((seller) => (
-                      <tr key={seller.id} className="hover:bg-slate-50">
-                        <td className="p-3.5 font-extrabold text-slate-900">{seller.name}</td>
-                        <td className="p-3.5 font-mono text-slate-700">{seller.email}</td>
-                        <td className="p-3.5 text-slate-700 font-mono">{seller.phone || '+91 9876543210'}</td>
-                        <td className="p-3.5 text-slate-500">{seller.createdAt || '2026-07-27'}</td>
+                    topupRequests.map((req) => (
+                      <tr key={req.id} className="hover:bg-slate-50">
+                        <td className="p-3.5 font-bold font-mono text-slate-900">{req.id}</td>
+                        <td className="p-3.5">
+                          <div className="font-extrabold text-slate-900">{req.userName}</div>
+                          <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-bold">
+                            ID: {req.userId}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-extrabold text-emerald-600">₹{req.netBudget.toLocaleString('en-IN')}</td>
+                        <td className="p-3.5 text-slate-700">₹{req.totalPaid.toLocaleString('en-IN')}</td>
+                        <td className="p-3.5 font-mono text-blue-700 font-bold text-xs bg-blue-50/50 px-2 py-1 rounded inline-block">
+                          {req.utrNumber}
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
+                            req.status === 'APPROVED'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : req.status === 'REJECTED'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {req.status === 'APPROVED' ? '● APPROVED & CREDITED' : req.status === 'REJECTED' ? '❌ REJECTED' : '⏳ PENDING APPROVAL'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right space-x-2">
+                          {req.status === 'PENDING' ? (
+                            <>
+                              <button
+                                onClick={() => handleApproveTopup(req.id)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] py-1.5 px-3 rounded-xl shadow-xs"
+                              >
+                                Approve & Credit Wallet ✓
+                              </button>
+                              <button
+                                onClick={() => handleRejectTopup(req.id)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-[11px] py-1.5 px-2.5 rounded-xl border border-rose-200"
+                              >
+                                Reject ❌
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-bold">Processed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-semibold">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                  <th className="p-3.5">User ID & Name</th>
+                  <th className="p-3.5">Email Address</th>
+                  <th className="p-3.5">Phone Number</th>
+                  <th className="p-3.5">Ad Wallet Balance</th>
+                  <th className="p-3.5">Account Status</th>
+                  <th className="p-3.5">Winning Access</th>
+                  <th className="p-3.5 text-right">Admin Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredSellers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
+                      No dropshippers found matching your search.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSellers.map((seller) => (
+                    <tr key={seller.id} className="hover:bg-slate-50">
+                      <td className="p-3.5">
+                        <div className="font-extrabold text-slate-900">{seller.name}</div>
+                        <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-bold">
+                          ID: {seller.id}
+                        </span>
+                      </td>
+                      <td className="p-3.5 font-mono text-slate-700">{seller.email}</td>
+                      <td className="p-3.5 text-slate-700 font-mono">{seller.phone || '+91 9876543210'}</td>
+                      <td className="p-3.5 font-extrabold text-emerald-600 text-sm">
+                        ₹{(seller.walletBalance || 0).toLocaleString('en-IN')}
+                      </td>
                         <td className="p-3.5">
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
                             seller.status === 'ACTIVE'
@@ -632,15 +807,25 @@ export default function AdminDashboard({
             </form>
           </div>
 
-          {/* Orders Table */}
+          {/* Orders Table with Roposo Status Sync */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-4 shadow-sm">
-            <div className="flex justify-between items-center border-b border-slate-200 pb-4">
-              <h3 className="font-extrabold text-slate-900 text-base font-heading">
-                All Platform Orders ({platformOrders.length} Total Orders)
-              </h3>
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                100+ DROPSHIPPERS AGGREGATED
-              </span>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base font-heading">
+                  All Platform Orders ({platformOrders.length} Total Orders)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Bulk sync Delivered / NDR / RTO statuses from Roposo Clout CSV or update courier AWB codes manually.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all">
+                  <input type="file" accept=".csv" onChange={handleRoposoCsvUpload} className="hidden" />
+                  <FileSpreadsheet className="w-4 h-4 text-cyan-300" />
+                  <span>📥 Bulk Sync Roposo Status CSV</span>
+                </label>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -648,45 +833,91 @@ export default function AdminDashboard({
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     <th className="p-3.5">Order ID</th>
-                    <th className="p-3.5">Seller (Dropshipper)</th>
-                    <th className="p-3.5">Customer Name & Phone</th>
-                    <th className="p-3.5">Product & SKU</th>
-                    <th className="p-3.5">Total Price</th>
-                    <th className="p-3.5">Shipping City / State</th>
-                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5">Dropshipper</th>
+                    <th className="p-3.5">Customer & Phone</th>
+                    <th className="p-3.5">Product</th>
+                    <th className="p-3.5">Price</th>
+                    <th className="p-3.5">Courier AWB</th>
+                    <th className="p-3.5">Order Status (Roposo)</th>
+                    <th className="p-3.5 text-right">Update Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {platformOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                      <td colSpan={8} className="p-8 text-center text-slate-400">
                         No orders recorded yet across dropshipper stores.
                       </td>
                     </tr>
                   ) : (
-                    platformOrders.map((ord, idx) => (
-                      <tr key={ord.id || idx} className="hover:bg-slate-50">
-                        <td className="p-3.5 font-bold font-mono text-slate-900">{ord.order_number || ord.id || `#360-${1000 + idx}`}</td>
-                        <td className="p-3.5 text-blue-700 font-extrabold">{ord.sellerName || ord.sellerEmail || 'Dropshipper'}</td>
-                        <td className="p-3.5 text-slate-900">
-                          <div>{ord.customer_name || ord.customer?.first_name || 'Customer'}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">{ord.phone || ord.shipping_address?.phone || ''}</div>
-                        </td>
-                        <td className="p-3.5 text-slate-800 max-w-xs truncate">
-                          <div>{ord.product_name || ord.line_items?.[0]?.title || 'Dropship Product'}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{ord.sku || ord.line_items?.[0]?.sku || ''}</div>
-                        </td>
-                        <td className="p-3.5 font-extrabold text-emerald-600">₹{ord.total_price || ord.sellingPrice || 999}</td>
-                        <td className="p-3.5 text-slate-600">
-                          {ord.shipping_address?.city || ord.city || 'City'}, {ord.shipping_address?.province || ord.state || 'State'}
-                        </td>
-                        <td className="p-3.5">
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {ord.financial_status || 'PAID / READY'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    platformOrders.map((ord, idx) => {
+                      const currentStatus = ord.fulfillmentStatus || ord.status || 'In-Transit';
+                      const sellerId = ord.sellerId || 'USR-1001';
+                      const orderId = ord.id || ord.order_number;
+
+                      return (
+                        <tr key={ord.id || idx} className="hover:bg-slate-50">
+                          <td className="p-3.5 font-bold font-mono text-slate-900">{ord.order_number || ord.id || `#360-${1000 + idx}`}</td>
+                          <td className="p-3.5">
+                            <div className="text-blue-700 font-extrabold">{ord.sellerName || ord.sellerEmail || 'Dropshipper'}</div>
+                            <div className="font-mono text-[10px] text-slate-400">ID: {sellerId}</div>
+                          </td>
+                          <td className="p-3.5 text-slate-900">
+                            <div>{ord.customer_name || ord.customer?.first_name || 'Customer'}</div>
+                            <div className="text-[11px] text-slate-500 font-mono">{ord.phone || ord.shipping_address?.phone || ''}</div>
+                          </td>
+                          <td className="p-3.5 text-slate-800 max-w-xs truncate">
+                            <div>{ord.product_name || ord.line_items?.[0]?.title || 'Dropship Product'}</div>
+                          </td>
+                          <td className="p-3.5 font-extrabold text-emerald-600">₹{ord.total_price || ord.sellingPrice || 999}</td>
+                          <td className="p-3.5 font-mono text-xs">
+                            {ord.awbCode ? (
+                              <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                {ord.awbCode}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-normal">No AWB</span>
+                            )}
+                          </td>
+                          <td className="p-3.5">
+                            <div className="space-y-1">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
+                                currentStatus === 'Delivered'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : currentStatus === 'NDR'
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200 animate-pulse'
+                                  : currentStatus === 'RTO'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}>
+                                {currentStatus === 'Delivered' ? '● DELIVERED' : currentStatus === 'NDR' ? '🚨 NDR (ACTION REQD)' : currentStatus === 'RTO' ? '⚠️ RTO (RETURNED)' : '🚚 IN-TRANSIT'}
+                              </span>
+                              {ord.ndrActionSubmitted && (
+                                <p className="text-[10px] text-purple-700 font-bold bg-purple-50 p-1 rounded border border-purple-200">
+                                  NDR Note: {ord.ndrInstructions}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <select
+                              value={currentStatus}
+                              onChange={(e) => {
+                                const newSt = e.target.value;
+                                const awb = ord.awbCode || window.prompt('Enter Courier AWB Tracking Code (optional):', ord.awbCode || '');
+                                handleUpdateSingleOrderStatus(sellerId, orderId, newSt, awb || '');
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                            >
+                              <option value="In-Transit">In-Transit</option>
+                              <option value="Delivered">Delivered (Clear Profit)</option>
+                              <option value="NDR">NDR (Action Required)</option>
+                              <option value="RTO">RTO (Returned)</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -699,13 +930,13 @@ export default function AdminDashboard({
       {/* TAB 1: Payout Approval Desk */}
       {currentTab === 'payout-approvals' && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
-          <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
             <div>
               <h3 className="font-extrabold text-slate-900 text-lg font-heading">Dropshipper Bank & UPI Payout Approval Desk</h3>
               <p className="text-xs text-slate-500">Review pending profit withdrawal requests and input bank UTR transaction receipt.</p>
             </div>
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              DIRECT BANK / UPI PAYOUT
+            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              {(dbService.getPayoutRequests ? dbService.getPayoutRequests() : []).filter(r => r.status === 'PENDING').length} PENDING PAYOUTS
             </span>
           </div>
 
@@ -714,45 +945,79 @@ export default function AdminDashboard({
               <thead>
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   <th className="p-3.5">Request ID</th>
-                  <th className="p-3.5">Seller Name</th>
+                  <th className="p-3.5">Dropshipper</th>
                   <th className="p-3.5">Requested Amount</th>
-                  <th className="p-3.5">UPI VPA / Bank</th>
+                  <th className="p-3.5">UPI VPA / Bank Details</th>
                   <th className="p-3.5">Status</th>
-                  <th className="p-3.5 text-right">Action</th>
+                  <th className="p-3.5 text-right">Verification Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {payoutRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-slate-50">
-                    <td className="p-3.5 font-bold font-mono text-slate-900">{req.id}</td>
-                    <td className="p-3.5 text-slate-800 font-bold">{req.sellerName}</td>
-                    <td className="p-3.5 font-black text-emerald-600 text-sm">₹{req.amount.toLocaleString('en-IN')}</td>
-                    <td className="p-3.5 text-cyan-600 font-mono font-bold">{req.upiId}</td>
-                    <td className="p-3.5">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
-                        req.status === 'Approved'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {req.status}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-right">
-                      {req.status === 'Pending' ? (
-                        <button
-                          onClick={() => setSelectedRequest(req)}
-                          className="btn-primary text-[11px] py-1.5 px-3 rounded-lg shadow-xs"
-                        >
-                          Approve Payout →
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-slate-500 font-mono font-bold">
-                          UTR: {req.utr}
-                        </span>
-                      )}
+                {(dbService.getPayoutRequests ? dbService.getPayoutRequests() : []).length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-400 font-bold">
+                      No payout withdrawal requests submitted by dropshippers yet.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  (dbService.getPayoutRequests ? dbService.getPayoutRequests() : []).map((req) => (
+                    <tr key={req.id} className="hover:bg-slate-50">
+                      <td className="p-3.5 font-bold font-mono text-slate-900">{req.id}</td>
+                      <td className="p-3.5">
+                        <div className="font-extrabold text-slate-900">{req.userName}</div>
+                        <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-bold">
+                          ID: {req.userId}
+                        </span>
+                      </td>
+                      <td className="p-3.5 font-black text-emerald-600 text-sm">₹{req.amount.toLocaleString('en-IN')}</td>
+                      <td className="p-3.5 text-cyan-700 font-mono font-bold">{req.upiId || req.bankDetails}</td>
+                      <td className="p-3.5">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
+                          req.status === 'APPROVED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : req.status === 'REJECTED'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {req.status === 'APPROVED' ? '● APPROVED & RELEASED' : req.status === 'REJECTED' ? '❌ REJECTED' : '⏳ PENDING APPROVAL'}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right space-x-2">
+                        {req.status === 'PENDING' ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                const utr = window.prompt('Enter Bank Transaction UTR Reference Number to Approve Payout:', `UTR-${Date.now()}`);
+                                if (utr && dbService.approvePayoutRequest) {
+                                  dbService.approvePayoutRequest(req.id, utr);
+                                  refreshSellersList();
+                                }
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] py-1.5 px-3 rounded-xl shadow-xs"
+                            >
+                              Approve Payout & Release Funds ✓
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Reject payout request ${req.id}?`) && dbService.rejectPayoutRequest) {
+                                  dbService.rejectPayoutRequest(req.id);
+                                  refreshSellersList();
+                                }
+                              }}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-[11px] py-1.5 px-2.5 rounded-xl border border-rose-200"
+                            >
+                              Reject ❌
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-slate-500 font-mono font-bold">
+                            UTR: {req.utrNumber || 'APPROVED'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -984,28 +1249,59 @@ export default function AdminDashboard({
         </div>
       )}
 
-      {/* TAB 4: Platform Analytics */}
-      {currentTab === 'platform-analytics' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Total Platform Revenue</span>
-            <p className="text-3xl font-black text-slate-900 font-heading">₹2,84,900.00</p>
-            <p className="text-xs text-blue-600 mt-1 font-bold">5% Agency service fee revenue</p>
-          </div>
+      {/* TAB 4: Platform Analytics (REAL DYNAMIC DATA) */}
+      {currentTab === 'platform-analytics' && (() => {
+        const analytics = dbService.getPlatformAnalytics ? dbService.getPlatformAnalytics() : {
+          grossVolume: 0,
+          agencyServiceRevenue: 0,
+          totalSellers: sellersList.length,
+          activeSellers: sellersList.filter(s => s.status === 'ACTIVE').length,
+          totalOrders: 0,
+          totalApprovedPayouts: 0
+        };
 
-          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Active Dropshippers</span>
-            <p className="text-3xl font-black text-slate-900 font-heading">142 Sellers</p>
-            <p className="text-xs text-emerald-600 mt-1 font-bold">KYC & Store Connected</p>
-          </div>
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Platform Gross Revenue</span>
+              <p className="text-2xl font-black text-slate-900 font-heading">
+                ₹{analytics.grossVolume.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-blue-600 font-bold">5% Agency Fee Revenue: ₹{analytics.agencyServiceRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            </div>
 
-          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Catalog Inventory</span>
-            <p className="text-3xl font-black text-slate-900 font-heading">{products.length} Items</p>
-            <p className="text-xs text-blue-600 mt-1 font-bold">Ready to ship nationwide</p>
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Active Dropshippers</span>
+              <p className="text-2xl font-black text-emerald-600 font-heading">
+                {analytics.activeSellers} Active Dropshippers
+              </p>
+              <p className="text-xs text-slate-500 font-medium">Out of {analytics.totalSellers} Registered Dropshippers</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Platform Orders</span>
+              <p className="text-2xl font-black text-cyan-600 font-heading">
+                {analytics.totalOrders} Orders Placed
+              </p>
+              <p className="text-xs text-slate-500 font-medium">Across all connected dropshipper stores</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Released Dropshipper Payouts</span>
+              <p className="text-2xl font-black text-emerald-700 font-heading">
+                ₹{analytics.totalApprovedPayouts.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-emerald-600 font-bold">Total approved bank/UPI settlements</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Catalog Inventory Items</span>
+              <p className="text-2xl font-black text-blue-600 font-heading">{products.length} Products</p>
+              <p className="text-xs text-slate-500 font-medium">Ready to ship nationwide</p>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ADD / EDIT PRODUCT MODAL */}
       {productModalOpen && (

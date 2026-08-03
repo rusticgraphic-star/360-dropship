@@ -225,6 +225,100 @@ export const dbService = {
     return allOrders;
   },
 
+  // Update Individual Order Status & Courier AWB Code
+  updateOrderStatus(userId, orderId, newStatus, awbCode = '', courierName = '') {
+    if (!userId || !orderId) return false;
+    const orders = dbService.getUserOrders(userId);
+    const updated = orders.map(o => {
+      const currentId = String(o.id || o.order_number);
+      if (currentId === String(orderId)) {
+        return {
+          ...o,
+          fulfillmentStatus: newStatus,
+          status: newStatus,
+          awbCode: awbCode || o.awbCode || '',
+          courierName: courierName || o.courierName || 'Roposo Courier',
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return o;
+    });
+    dbService.saveUserOrders(userId, updated);
+    return true;
+  },
+
+  // Bulk Import Roposo Clout / Courier Export CSV to Sync Delivered / NDR / RTO Status
+  bulkSyncRoposoOrderStatuses(rows) {
+    dbService.init();
+    const usersStr = safeStorage.getItem(DB_USERS_KEY) || '[]';
+    let users = [];
+    try { users = JSON.parse(usersStr); } catch (e) { users = []; }
+
+    let updatedCount = 0;
+
+    for (const u of users) {
+      if (!u || !u.id) continue;
+      const userOrders = dbService.getUserOrders(u.id);
+      if (!userOrders.length) continue;
+
+      let isModified = false;
+      const updatedOrders = userOrders.map(o => {
+        const orderNum = String(o.order_number || o.id || '').replace('#', '').trim();
+        const matchingRow = rows.find(r => {
+          const rowOrder = String(r.orderNumber || r['Order Number'] || r['Order ID'] || r['Order'] || r['order_id'] || '').replace('#', '').trim();
+          return rowOrder && (rowOrder === orderNum || orderNum.includes(rowOrder));
+        });
+
+        if (matchingRow) {
+          isModified = true;
+          updatedCount++;
+          const rawStatus = String(matchingRow.status || matchingRow['Status'] || matchingRow['Fulfillment Status'] || matchingRow['rto_status'] || 'Delivered').trim().toLowerCase();
+          let parsedStatus = 'In-Transit';
+          if (rawStatus.includes('deliver')) parsedStatus = 'Delivered';
+          else if (rawStatus.includes('rto') || rawStatus.includes('return')) parsedStatus = 'RTO';
+          else if (rawStatus.includes('ndr') || rawStatus.includes('failed') || rawStatus.includes('attempt')) parsedStatus = 'NDR';
+          else if (rawStatus.includes('transit') || rawStatus.includes('shipped')) parsedStatus = 'In-Transit';
+
+          return {
+            ...o,
+            fulfillmentStatus: parsedStatus,
+            status: parsedStatus,
+            awbCode: matchingRow.awb || matchingRow['AWB'] || matchingRow['Tracking Number'] || matchingRow['awb_number'] || o.awbCode || '',
+            courierName: matchingRow.courier || matchingRow['Courier'] || o.courierName || 'Roposo Courier',
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return o;
+      });
+
+      if (isModified) {
+        dbService.saveUserOrders(u.id, updatedOrders);
+      }
+    }
+    return updatedCount;
+  },
+
+  // Save Dropshipper NDR Re-attempt Instructions for Roposo Clout
+  submitNdrAction(userId, orderId, instructions, altPhone) {
+    if (!userId || !orderId) return false;
+    const orders = dbService.getUserOrders(userId);
+    const updated = orders.map(o => {
+      const currentId = String(o.id || o.order_number);
+      if (currentId === String(orderId)) {
+        return {
+          ...o,
+          ndrActionSubmitted: true,
+          ndrInstructions: instructions,
+          altPhone: altPhone || '',
+          ndrSubmittedAt: new Date().toISOString()
+        };
+      }
+      return o;
+    });
+    dbService.saveUserOrders(userId, updated);
+    return true;
+  },
+
   // Per-User Wallet Isolation
   getUserWallet(userId) {
     if (!userId) return 0;
@@ -237,6 +331,144 @@ export const dbService = {
     if (userId) {
       safeStorage.setItem(`360_wallet_${userId}`, JSON.stringify(balance));
     }
+  },
+
+  // Pending Ad Wallet Recharge Requests (Admin Approval Flow)
+  getWalletTopupRequests() {
+    const str = safeStorage.getItem('360_wallet_topup_requests') || '[]';
+    try { return JSON.parse(str); } catch (e) { return []; }
+  },
+
+  submitWalletTopupRequest({ userId, userName, userEmail, netBudget, totalPaid, utrNumber }) {
+    dbService.init();
+    const requests = dbService.getWalletTopupRequests();
+    const newReq = {
+      id: `TOPUP-${Math.floor(10000 + Math.random() * 90000)}`,
+      userId: userId || 'USR-1001',
+      userName: userName || userEmail || 'Dropshipper',
+      userEmail: userEmail || '',
+      netBudget: Number(netBudget) || 1000,
+      totalPaid: Number(totalPaid) || 1180,
+      utrNumber: String(utrNumber).trim(),
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+    requests.unshift(newReq);
+    safeStorage.setItem('360_wallet_topup_requests', JSON.stringify(requests));
+    return newReq;
+  },
+
+  approveWalletTopupRequest(requestId) {
+    dbService.init();
+    const requests = dbService.getWalletTopupRequests();
+    const reqIndex = requests.findIndex(r => r.id === requestId);
+    if (reqIndex !== -1 && requests[reqIndex].status === 'PENDING') {
+      const targetReq = requests[reqIndex];
+      targetReq.status = 'APPROVED';
+      targetReq.approvedAt = new Date().toISOString();
+      requests[reqIndex] = targetReq;
+      safeStorage.setItem('360_wallet_topup_requests', JSON.stringify(requests));
+
+      // Credit balance to user's wallet
+      if (targetReq.userId) {
+        const currentBal = dbService.getUserWallet(targetReq.userId);
+        const newBal = currentBal + targetReq.netBudget;
+        dbService.saveUserWallet(targetReq.userId, newBal);
+      }
+      return { success: true, request: targetReq };
+    }
+    return { success: false, error: 'Request not found or already processed' };
+  },
+
+  rejectWalletTopupRequest(requestId) {
+    dbService.init();
+    const requests = dbService.getWalletTopupRequests();
+    const reqIndex = requests.findIndex(r => r.id === requestId);
+    if (reqIndex !== -1 && requests[reqIndex].status === 'PENDING') {
+      requests[reqIndex].status = 'REJECTED';
+      requests[reqIndex].rejectedAt = new Date().toISOString();
+      safeStorage.setItem('360_wallet_topup_requests', JSON.stringify(requests));
+      return { success: true, request: requests[reqIndex] };
+    }
+    return { success: false, error: 'Request not found or already processed' };
+  },
+
+  // Real Dropshipper Payout Requests Management
+  getPayoutRequests() {
+    const str = safeStorage.getItem('360_payout_requests') || '[]';
+    try { return JSON.parse(str); } catch (e) { return []; }
+  },
+
+  submitPayoutRequest({ userId, userName, userEmail, amount, upiId, bankDetails }) {
+    dbService.init();
+    const requests = dbService.getPayoutRequests();
+    const newReq = {
+      id: `PAY-${Math.floor(10000 + Math.random() * 90000)}`,
+      userId: userId || 'USR-1001',
+      userName: userName || userEmail || 'Dropshipper',
+      userEmail: userEmail || '',
+      amount: Number(amount) || 1000,
+      upiId: upiId || 'dropshipper@upi',
+      bankDetails: bankDetails || 'HDFC Bank, Acc: XXXX1234',
+      status: 'PENDING',
+      utrNumber: '',
+      createdAt: new Date().toISOString()
+    };
+    requests.unshift(newReq);
+    safeStorage.setItem('360_payout_requests', JSON.stringify(requests));
+    return newReq;
+  },
+
+  approvePayoutRequest(requestId, utrNumber) {
+    dbService.init();
+    const requests = dbService.getPayoutRequests();
+    const reqIndex = requests.findIndex(r => r.id === requestId);
+    if (reqIndex !== -1 && requests[reqIndex].status === 'PENDING') {
+      const targetReq = requests[reqIndex];
+      targetReq.status = 'APPROVED';
+      targetReq.utrNumber = String(utrNumber).trim() || `BANK-UTR-${Date.now()}`;
+      targetReq.approvedAt = new Date().toISOString();
+      requests[reqIndex] = targetReq;
+      safeStorage.setItem('360_payout_requests', JSON.stringify(requests));
+      return { success: true, request: targetReq };
+    }
+    return { success: false, error: 'Payout request not found or already processed' };
+  },
+
+  rejectPayoutRequest(requestId) {
+    dbService.init();
+    const requests = dbService.getPayoutRequests();
+    const reqIndex = requests.findIndex(r => r.id === requestId);
+    if (reqIndex !== -1 && requests[reqIndex].status === 'PENDING') {
+      requests[reqIndex].status = 'REJECTED';
+      requests[reqIndex].rejectedAt = new Date().toISOString();
+      safeStorage.setItem('360_payout_requests', JSON.stringify(requests));
+      return { success: true, request: requests[reqIndex] };
+    }
+    return { success: false, error: 'Payout request not found or already processed' };
+  },
+
+  // Live Dynamic Platform Analytics Calculation
+  getPlatformAnalytics() {
+    dbService.init();
+    const sellers = dbService.getSellers();
+    const orders = dbService.getAllPlatformOrders();
+    const payouts = dbService.getPayoutRequests();
+
+    const grossVolume = orders.reduce((acc, o) => acc + (Number(o.total_price || o.sellingPrice || 999)), 0);
+    const agencyServiceRevenue = grossVolume * 0.05; // 5% Agency fee
+    const activeDropshippersCount = sellers.filter(s => s.status === 'ACTIVE').length;
+    const totalOrdersCount = orders.length;
+    const totalApprovedPayouts = payouts.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+    return {
+      grossVolume,
+      agencyServiceRevenue,
+      totalSellers: sellers.length,
+      activeSellers: activeDropshippersCount,
+      totalOrders: totalOrdersCount,
+      totalApprovedPayouts
+    };
   },
 
   // Per-User Shopify Store Sync Isolation
@@ -391,6 +623,7 @@ export const dbService = {
       name: u.name || (u.email ? u.email.split('@')[0] : 'Registered Dropshipper'),
       email: u.email,
       phone: u.phone || '+91 9876543210',
+      walletBalance: dbService.getUserWallet(u.id),
       status: statusMap[u.id] || statusMap[u.email] || (u.email ? statusMap[u.email.toLowerCase().trim()] : null) || u.status || 'ACTIVE',
       hasWinningAccess: dbService.hasWinningAccess(u.id) || dbService.hasWinningAccess(u.email),
       createdAt: u.createdAt ? u.createdAt.split('T')[0] : '2026-07-27'

@@ -318,15 +318,15 @@ export default function App() {
 
   // Meta Graph API Auto-Pause / Auto-Resume logic
   const handlePaymentSuccess = (netBudget, totalPaid, utrNumber) => {
-    const newBalance = walletBalance + netBudget;
-    setWalletBalance(newBalance);
-    if (user?.id) {
-      dbService.saveUserWallet(user.id, newBalance);
-    }
-
-    // If balance restored > 0, set all campaigns to ACTIVE via Meta Graph API
-    if (newBalance > 0) {
-      setCampaigns(campaigns.map(c => ({ ...c, status: 'ACTIVE' })));
+    if (dbService.submitWalletTopupRequest) {
+      dbService.submitWalletTopupRequest({
+        userId: user?.id || 'USR-1001',
+        userName: user?.name || user?.email || 'Dropshipper',
+        userEmail: user?.email || '',
+        netBudget,
+        totalPaid,
+        utrNumber
+      });
     }
   };
 
@@ -418,6 +418,7 @@ export default function App() {
           <MetaAdsManagerView
             user={user}
             products={products}
+            userPushedIds={userPushedIds}
             campaigns={campaigns}
             walletBalance={walletBalance}
             onOpenRechargeModal={() => setRechargeModalOpen(true)}

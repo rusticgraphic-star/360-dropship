@@ -227,9 +227,9 @@ export default function DynamicUpiQrModal({ isOpen, onClose, agencyUpiId, onPaym
         ) : (
           <div className="text-center py-8 space-y-4">
             <CheckCircle2 className="w-16 h-16 text-emerald-600 mx-auto animate-bounce" />
-            <h4 className="font-extrabold text-xl text-slate-900 font-heading">Ad Wallet Recharged Successfully!</h4>
+            <h4 className="font-extrabold text-xl text-slate-900 font-heading">UTR Submitted for Admin Verification!</h4>
             <p className="text-xs text-slate-600 max-w-xs mx-auto">
-              ₹{rechargeAmount.toLocaleString('en-IN')} has been added to your Meta Ads wallet. Meta Agency account campaigns set to ACTIVE.
+              Your recharge request of <strong>₹{rechargeAmount.toLocaleString('en-IN')}</strong> (UTR: <span className="font-mono font-bold text-blue-600">{utrNumber}</span>) has been submitted to Admin. Your wallet balance will be credited as soon as Admin approves!
             </p>
           </div>
         )}
